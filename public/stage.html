@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>stage</title>
+<link rel="stylesheet" href="/api/fonts.css">
+<style>
+html, body { margin:0; background:transparent; overflow:hidden; }
+#stage { position:relative; width:1920px; height:1080px; background:transparent; overflow:hidden; }
+#text { position:absolute; white-space:pre; font-variant-numeric:tabular-nums; }
+#text .l { display:block; min-height:1em; }
+#text .slot { display:inline-block; position:relative; height:1em; vertical-align:top; }
+#text .ly { position:absolute; left:0; top:0; opacity:0; will-change:opacity,transform; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="text"></div></div>
+<script src="/engine.js"></script>
+<script src="/api/effects.js"></script>
+<script>
+// Headless export path: config arrives base64-encoded in ?c=
+(async () => {
+  await document.fonts.ready;
+  const params = new URLSearchParams(location.search);
+  if (params.has('c')) {
+    const config = JSON.parse(decodeURIComponent(escape(atob(params.get('c')))));
+    // make sure the fonts used are actually loaded before measuring
+    const s = config.style || {};
+    await document.fonts.load(`${s.italic ? 'italic ' : ''}${s.weight || 400} ${s.size || 300}px "${s.font || 'Archivo'}"`).catch(() => {});
+    window.TM_total = TM.load(config);
+    await TM.ready();
+    TM.seek(0);
+    window.TM_seek = t => TM.seek(t);
+    window.TM_ready = true;
+  } else {
+    window.TM_ready = true;
+    if (window.parent !== window) window.parent.postMessage({ tm: true, evt: 'ready', effects: TM.list() }, '*');
+  }
+})();
+</script>
+</body>
+</html>

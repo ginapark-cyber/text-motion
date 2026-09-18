@@ -1,0 +1,56 @@
+/* 새 효과 만들기
+ * 1. 이 파일을 복사해서 03-이름.js 처럼 저장 (번호 순서가 목록 순서. .txt 확장자는 빼야 로드됨)
+ * 2. 서버 재시작 없이 브라우저 새로고침만 하면 목록에 뜸
+ *
+ * 규칙
+ * - duration(): 효과 자체 길이(ms). 앞뒤 홀드는 엔진이 더해줌
+ * - mount(): root 안에 DOM을 만들고, render()에서 쓸 것들을 state로 돌려줌
+ *            각 줄은 <span class="l"> 로 감싸면 행간이 맞음
+ * - render(state, t): t(0~duration)에 해당하는 프레임을 그림. 반드시 t만 보고 결정적으로 그려야
+ *            미리보기와 내보내기가 똑같이 나옴 (Date.now, Math.random 금지 → ctx.rng(seed) 사용)
+ * - ctx: { style, params, timing, width, height, scale, easeOut, easeInOut, smooth, clamp01, rng }
+ * - params type: 'number' | 'select' | 'boolean' | 'text'
+ *   basic: true → 항상 보임 (나머지는 Advanced 켰을 때만), hidden: true → UI에 안 보임
+ *
+ * 그래픽 효과 (텍스트 안 쓰는 모션): kind: 'graphic' 을 추가하면 mount()의 root가 전체 화면 레이어가 되고
+ *   UI에서 텍스트/폰트/레이아웃 패널이 숨겨짐 (색상은 ctx.style.color). 08-logoroll.js 참고.
+ *   크기 단위: 모든 px 값은 FHD(1080p) 기준이고 엔진이 출력 해상도에 맞게 자동 확대 (ctx.scale). 4K도 같은 화면
+ *   이미지 로딩이 필요하면 state.ready = Promise 로 돌려주면 내보내기 전에 기다려줌.
+ */
+TM.register({
+  id: 'myeffect',
+  name: 'My effect',
+  params: [
+    { key: 'dur',     label: '길이 (ms)',   type: 'number', default: 800, min: 100, max: 5000, step: 50 },
+    { key: 'stagger', label: '간격 (ms)',   type: 'number', default: 60,  min: 0,   max: 1000, step: 10 },
+    { key: 'mode',    label: '방식',        type: 'select', default: 'a', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] },
+    { key: 'flag',    label: '옵션',        type: 'boolean', default: false },
+  ],
+
+  duration(lines, { params: p }) {
+    const n = lines.join('').replace(/\s/g, '').length;
+    return (n - 1) * p.stagger + p.dur;
+  },
+
+  mount(root, lines, ctx) {
+    const chars = [];
+    lines.forEach(ln => {
+      const line = document.createElement('span'); line.className = 'l'; root.appendChild(line);
+      [...ln].forEach(ch => {
+        const el = document.createElement('span'); el.textContent = ch; el.style.display = 'inline-block';
+        line.appendChild(el);
+        if (ch.trim()) chars.push(el);
+      });
+    });
+    return { chars };
+  },
+
+  render(st, t, ctx) {
+    const p = ctx.params;
+    st.chars.forEach((el, i) => {
+      const k = ctx.easeOut(ctx.clamp01((t - i * p.stagger) / p.dur));
+      el.style.opacity = k;
+      el.style.transform = `translateY(${(1 - k) * 40}px)`;
+    });
+  },
+});

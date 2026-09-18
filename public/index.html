@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text Motion</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%23e8e8ea%27/%3E%3Ctext x=%278%27 y=%2712%27 font-size=%2711%27 font-family=%27sans-serif%27 font-weight=%27700%27 text-anchor=%27middle%27 fill=%27%230f0f10%27%3ET%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/api/fonts.css">
+<style>
+:root{ --bg:#0e0e0f; --panel:#141416; --line:#232326; --text:#ececee; --muted:#86868e; --field:#1c1c1f; --hi:#2a2a2f; }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:13px/1.45 -apple-system,system-ui,"Inter",sans-serif}
+body{display:grid;grid-template-columns:280px 1fr 280px;grid-template-rows:52px 1fr;height:100vh}
+
+header{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:13px;font-weight:600;margin:0 8px 0 0;letter-spacing:.01em}
+header .sp{flex:1}
+#effect{min-width:240px}
+
+aside{background:var(--panel);overflow:auto;padding:18px}
+aside.left{border-right:1px solid var(--line)} aside.right{border-left:1px solid var(--line)}
+main{display:flex;flex-direction:column;min-width:0}
+#viewport{flex:1;display:flex;align-items:center;justify-content:center;padding:28px;min-height:0}
+#frame{position:relative;box-shadow:0 0 0 1px var(--line);overflow:hidden;flex:none}
+#frame.checker{background:linear-gradient(45deg,#1b1b1e 25%,transparent 25%,transparent 75%,#1b1b1e 75%),linear-gradient(45deg,#1b1b1e 25%,transparent 25%,transparent 75%,#1b1b1e 75%);background-color:#131315;background-size:24px 24px;background-position:0 0,12px 12px}
+#frame.black{background:#000} #frame.white{background:#fff}
+#frame iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;pointer-events:none}
+
+#bar{display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid var(--line);background:var(--panel)}
+#bar button{width:34px;height:30px;padding:0}
+#scrub{flex:1}
+#time{font-variant-numeric:tabular-nums;color:var(--muted);min-width:96px;text-align:right;font-size:12px}
+#speedBox{display:flex;align-items:center;gap:10px;padding-left:12px;border-left:1px solid var(--line)}
+#speedBox input[type=range]{width:140px}
+#speedV{font-variant-numeric:tabular-nums;min-width:38px;font-size:12px}
+
+h2{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 0 10px}
+h2:first-child{margin-top:0}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.row.one{grid-template-columns:1fr} .row.three{grid-template-columns:1fr 1fr 1fr}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--muted);min-width:0}
+.lv{display:flex;justify-content:space-between;align-items:center} .lv b{font-weight:500;color:var(--text)}
+label.f.inline{flex-direction:row;align-items:center;justify-content:space-between;font-size:12px;color:var(--text)}
+input,select,textarea,button{font:inherit;color:var(--text);background:var(--field);border:1px solid var(--line);border-radius:7px;padding:7px 9px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:#45454d}
+input[type=number]{width:100%}
+input[type=color]{padding:3px;height:32px;width:100%}
+input[type=range]{padding:0;background:transparent;border:0;accent-color:#e6e6ea;width:100%;min-width:0}
+input[type=checkbox]{width:15px;height:15px;padding:0;accent-color:#e6e6ea}
+textarea{width:100%;min-height:104px;resize:vertical;font-size:14px;line-height:1.4}
+button{cursor:pointer}
+button:hover{background:var(--hi)}
+button.primary{background:var(--text);color:#0f0f10;border-color:var(--text);font-weight:600;width:100%;padding:11px;margin-top:4px}
+button.primary:disabled{opacity:.4;cursor:default}
+.seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{flex:1;border:0;border-radius:0;padding:7px 0;font-size:12px;background:transparent}
+.seg button.on{background:var(--hi)}
+.pill{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.pill button{border:0;border-radius:0;padding:5px 10px;font-size:11px;background:transparent}
+.pill button.on{background:var(--hi)}
+details{border-top:1px solid var(--line);margin-top:20px;padding-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;padding:10px 0;list-style:none;display:flex;justify-content:space-between}
+details summary::after{content:'+'} details[open] summary::after{content:'–'}
+details .body{padding:4px 0 6px}
+.hint{color:var(--muted);font-size:11px;margin:8px 0 0;line-height:1.5}
+#progress{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin:12px 0 8px;display:none}
+#progress i{display:block;height:100%;background:var(--text);width:0;transition:width .2s}
+#status{font-size:12px;color:var(--muted);min-height:18px;white-space:pre-wrap;word-break:break-all}
+#logoList{list-style:none;margin:0 0 10px;padding:0}
+#logoList li{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px}
+#logoList li.off{opacity:.45}
+#logoList li{cursor:pointer;border-radius:6px;padding:6px 4px;margin:0 -4px}
+#logoList li.now{background:var(--hi)}
+#logoList .num{width:18px;flex:none;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;font-size:11px}
+#logoList li.off .num{visibility:hidden}
+#logoList .th{width:52px;height:26px;flex:none;border-radius:4px;background:linear-gradient(45deg,#9a9a9a 25%,transparent 25%,transparent 75%,#9a9a9a 75%),linear-gradient(45deg,#9a9a9a 25%,transparent 25%,transparent 75%,#9a9a9a 75%);background-color:#777;background-size:8px 8px;background-position:0 0,4px 4px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#logoList .th img{max-width:46px;max-height:20px}
+#logoList .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#logoList button{width:22px;height:22px;padding:0;font-size:11px;line-height:1;border-radius:5px}
+#logoList input[type=checkbox]{margin:0}
+#logoDrop{border:1px dashed var(--line);border-radius:7px;padding:12px;text-align:center;font-size:12px;color:var(--muted);cursor:pointer}
+#logoDrop.over{border-color:var(--text);color:var(--text)}
+.prange{width:100%;margin:2px 0 0}
+body:not(.advanced) .adv{display:none!important}
+#advToggle{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;padding:5px 10px;border:1px solid var(--line);border-radius:7px}
+#advToggle input{margin:0}
+body.advanced #advToggle{color:var(--text);background:var(--hi)}
+#status:empty{display:none}
+#gallery{position:fixed;left:0;right:0;top:52px;bottom:0;background:var(--bg);overflow:auto;padding:36px 40px;z-index:5}
+#gallery .intro{color:var(--muted);font-size:13px;margin:0 0 22px}
+#gallery .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px;max-width:1500px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s}
+.card:hover{border-color:#4a4a52;transform:translateY(-2px)}
+.card .pv{position:relative;aspect-ratio:16/9;background:linear-gradient(45deg,#1b1b1e 25%,transparent 25%,transparent 75%,#1b1b1e 75%),linear-gradient(45deg,#1b1b1e 25%,transparent 25%,transparent 75%,#1b1b1e 75%);background-color:#131315;background-size:16px 16px;background-position:0 0,8px 8px;overflow:hidden}
+.card .pv iframe{position:absolute;left:0;top:0;width:1920px;height:1080px;border:0;transform-origin:0 0;pointer-events:none}
+.card .meta{padding:12px 14px 14px}
+.card .meta b{display:block;font-size:13px;font-weight:600;margin-bottom:3px}
+.card .meta span{font-size:11.5px;color:var(--muted);line-height:1.45}
+#backBtn{font-size:12px;padding:6px 10px}
+body.gallery #effect,body.gallery #backBtn,body.gallery #bgPill,body.gallery #advToggle{display:none}
+#paramsBox h2{margin-top:22px}
+.banner{background:#3a2a12;color:#f3d9a4;border:1px solid #6b4d1e;border-radius:7px;padding:9px 11px;font-size:12px;margin-bottom:14px;line-height:1.45}
+#logoDrop{margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Text Motion</h1>
+  <button id="backBtn" title="Back to the effect gallery">‹ Effects</button>
+  <select id="effect"></select>
+  <span class="sp"></span>
+  <span class="pill" id="bgPill" title="Preview background only — exports are always transparent">
+    <button data-bg="checker" class="on">Transparent</button><button data-bg="black">Black</button><button data-bg="white">White</button>
+  </span>
+  <label id="advToggle" title="Show every setting (margins, typography, timing, frame rate, format, all effect parameters)"><input type="checkbox" id="advanced"> Advanced</label>
+</header>
+
+<section id="gallery" hidden>
+  <p class="intro">Pick an effect — the preview loops with your current text. Click a card to edit and export.</p>
+  <div class="cards" id="cards"></div>
+</section>
+
+<aside class="left">
+  <div id="serverBanner" class="banner" hidden>The server is running an older version. Quit it (Ctrl+C) and run <b>start.command</b> again.</div>
+  <div class="textonly">
+  <h2>Text</h2>
+  <div class="row one"><textarea id="text" spellcheck="false">Dexterity
+manipulation</textarea></div>
+
+  <h2>Font</h2>
+  <div class="row"><label class="f">Family<select id="font"></select></label><label class="f">Style<select id="weight"></select></label></div>
+  <div class="row"><label class="f"><span class="lv">Size <b class="sv" data-for="size" data-unit=" px"></b></span><input type="range" id="size" min="60" max="900" step="10" value="260"></label><label class="f">Color<input type="color" id="color" value="#ffffff"></label></div>
+
+  <h2>Position</h2>
+  <div class="row one"><span class="seg" id="alignPill"><button data-v="left" class="on">Left</button><button data-v="center">Center</button><button data-v="right">Right</button></span><input type="hidden" id="align" value="left"></div>
+  <div class="row one"><span class="seg" id="vposSeg"><button data-v="top" class="on">Top</button><button data-v="center">Middle</button><button data-v="bottom">Bottom</button></span><input type="hidden" id="vpos" value="top"></div>
+  <div class="row adv">
+    <label class="f"><span class="lv">Margin X <b class="sv" data-for="x" data-unit=" px"></b></span><input type="range" id="x" min="0" max="1200" step="10" value="120"></label>
+    <label class="f"><span class="lv">Margin Y <b class="sv" data-for="y" data-unit=" px"></b></span><input type="range" id="y" min="0" max="1200" step="10" value="120"></label>
+  </div>
+
+  <details class="adv"><summary>Typography</summary><div class="body">
+    <div class="row"><label class="f"><span class="lv">Width <b class="sv" data-for="width" data-unit="%"></b></span><input type="range" id="width" min="62" max="125" step="1" value="100"></label><label class="f inline" style="align-self:end">Italic <input type="checkbox" id="italic"></label></div>
+    <div class="row"><label class="f"><span class="lv">Tracking <b class="sv" data-for="tracking" data-unit=" em"></b></span><input type="range" id="tracking" min="-0.1" max="0.2" step="0.001" value="-0.016"></label><label class="f"><span class="lv">Line height <b class="sv" data-for="leading" data-unit=""></b></span><input type="range" id="leading" min="0.5" max="1.6" step="0.01" value="0.62"></label></div>
+  </div></details>
+  </div>
+
+  <div class="graphiconly" hidden>
+    <div id="logoMgr" hidden>
+      <h2>Logos</h2>
+      <ul id="logoList"></ul>
+      <div id="logoDrop">Add logos<br><span style="font-size:11px">click or drop PNG / JPG / SVG</span><input type="file" id="logoFile" accept="image/*" multiple hidden></div>
+    </div>
+    <h2>Color</h2>
+    <div class="row one"><label class="f"><input type="color" id="gcolor" value="#ffffff"></label></div>
+  </div>
+
+  <h2>Exit</h2>
+  <div class="row"><label class="f">Exit animation<select id="exit"><option value="none">None</option><option value="reverse">Reverse out</option></select></label>
+    <label class="f" id="holdBox" hidden><span class="lv">Hold <b class="sv" data-for="hold" data-unit=" ms"></b></span><input type="range" id="hold" min="0" max="8000" step="100" value="1500"></label></div>
+  <div class="row adv" id="exitSpeedBox" hidden><label class="f"><span class="lv">Exit speed <b class="sv" data-for="exitSpeed" data-unit="×"></b></span><input type="range" id="exitSpeed" min="0.25" max="3" step="0.05" value="1"></label></div>
+
+  <details class="adv"><summary>Timing</summary><div class="body">
+    <div class="row"><label class="f"><span class="lv">Start delay <b class="sv" data-for="preHold" data-unit=" ms"></b></span><input type="range" id="preHold" min="0" max="2000" step="10" value="80"></label><label class="f"><span class="lv">Hold at end <b class="sv" data-for="endHold" data-unit=" ms"></b></span><input type="range" id="endHold" min="0" max="5000" step="100" value="2000"></label></div>
+  </div></details>
+</aside>
+
+<main>
+  <div id="viewport"><div id="frame" class="checker"><iframe id="stage" src="/stage.html"></iframe></div></div>
+  <div id="bar">
+    <button id="play" title="Play / pause (space)">▶</button>
+    <button id="restart" title="Restart">↺</button>
+    <input type="range" id="scrub" min="0" max="1000" value="0" step="1">
+    <span id="time">0.00 / 0.00 s</span>
+    <label class="f inline" style="gap:6px;white-space:nowrap" title="Replay automatically"><input type="checkbox" id="loop" checked> Loop</label>
+    <span id="speedBox" title="Playback speed of the effect — applies to the export too">
+      <span style="color:var(--muted);font-size:12px">Speed</span>
+      <input type="range" id="speed" min="0.25" max="3" step="0.05" value="1">
+      <b id="speedV">1.00×</b>
+    </span>
+  </div>
+</main>
+
+<aside class="right">
+  <h2>Export</h2>
+  <div class="row one"><label class="f">Size<select id="preset">
+      <option value="3840x2160" selected>4K · 3840×2160</option><option value="1920x1080">FHD · 1920×1080</option><option value="1080x1920">Vertical FHD · 1080×1920</option><option value="2160x3840">Vertical 4K · 2160×3840</option><option value="2160x2160">Square · 2160×2160</option><option value="custom">Custom</option>
+    </select></label></div>
+  <div class="row" id="customSize" hidden><label class="f">Width<input type="number" id="w" value="3840" step="2"></label><label class="f">Height<input type="number" id="h" value="2160" step="2"></label></div>
+  <div class="row adv"><label class="f">Frame rate<select id="fps"><option>24</option><option>25</option><option selected>30</option><option>60</option></select></label><label class="f">Format<select id="format">
+      <option value="prores4444">ProRes 4444 (alpha)</option>
+      <option value="png">PNG sequence</option>
+      <option value="mp4">H.264 mp4 (black bg)</option>
+    </select></label></div>
+  <div class="row one"><label class="f">File name<input type="text" id="name" placeholder="Defaults to the text"></label></div>
+  <button class="primary" id="export">Export .mov</button>
+  <div id="progress"><i></i></div>
+  <div id="status"></div>
+  <p class="hint">Transparent background · saved to the <a href="#" id="openExports" style="color:var(--text)">exports folder</a></p>
+
+  <div id="paramsBox" hidden><h2 id="paramsTitle">Effect settings</h2><div id="params"></div></div>
+
+</aside>
+
+<script>
+const $ = id => document.getElementById(id);
+const stage = $('stage'), frame = $('frame');
+let effects = [], total = 0, curT = 0, playing = false, stageReady = false;
+const STORE = 'text-motion:v10';
+
+/* ---------- state ---------- */
+function readConfig(){
+  const params = {};
+  document.querySelectorAll('#params [data-key]').forEach(el => {
+    params[el.dataset.key] = el.type === 'checkbox' ? el.checked : (el.tagName === 'SELECT' && isNaN(el.value) ? el.value : (el.type === 'number' || el.type === 'range' ? +el.value : el.value));
+  });
+  return {
+    effect: $('effect').value,
+    text: $('text').value,
+    width: +$('w').value, height: +$('h').value, fps: +$('fps').value,
+    speed: +$('speed').value,
+    bg: 'transparent',
+    style: { font: $('font').value, weight: +$('weight').value, width: +$('width').value, italic: $('italic').checked,
+             size: +$('size').value, tracking: +$('tracking').value, leading: +$('leading').value, color: (isGraphic() ? $('gcolor') : $('color')).value,
+             anchor: $('vpos').value + '-' + $('align').value, x: +$('x').value, y: +$('y').value, align: $('align').value },
+    timing: { preHold: +$('preHold').value, endHold: +$('endHold').value, exit: $('exit').value, hold: +$('hold').value, exitSpeed: +$('exitSpeed').value },
+    params,
+  };
+}
+function save(){ try {
+  const def = effects.find(e => e.id === $('effect').value); const pdefaults = {}; (def ? def.params : []).forEach(p => { pdefaults[p.key] = p.default; });
+  localStorage.setItem(STORE, JSON.stringify({ ...readConfig(), format: $('format').value, preset: $('preset').value, gcolor: $('gcolor').value, tcolor: $('color').value, pdefaults }));
+} catch {} }
+function restore(){
+  let s; try { s = JSON.parse(localStorage.getItem(STORE)); } catch {} if (!s) return;
+  $('text').value = s.text ?? $('text').value;
+  $('w').value = s.width; $('h').value = s.height; $('fps').value = s.fps;
+  if (s.preset) { $('preset').value = s.preset; $('customSize').hidden = s.preset !== 'custom'; }
+  if (s.speed) { $('speed').value = s.speed; showSpeed(); }
+  if (s.gcolor) $('gcolor').value = s.gcolor;
+  Object.entries(s.style || {}).forEach(([k,v]) => { const el = $(k); if (!el) return; if (el.type === 'checkbox') el.checked = v; else el.value = v; });
+  if (s.style && s.style.anchor) { const [v] = s.style.anchor.split('-'); setVpos(v, false); }
+  if (s.tcolor) $('color').value = s.tcolor;
+  showVals();
+  if (s.style && s.style.align) setAlign(s.style.align, false);
+  Object.entries(s.timing || {}).forEach(([k,v]) => { if ($(k)) $(k).value = v; });
+  if (s.format) { $('format').value = s.format; setExportLabel(); }
+  if (s.effect) $('effect').value = s.effect;
+  return s;
+}
+
+/* ---------- effect params (advanced, collapsed) ---------- */
+function buildParams(effectId, values = {}, savedDefaults = {}){
+  const def = effects.find(e => e.id === effectId); if (!def) return;
+  // a saved value that still equals the default it was saved with was never touched by the user →
+  // follow the current default instead (so updated effect defaults actually show up)
+  values = { ...values }; Object.keys(values).forEach(k => { if (k in savedDefaults && values[k] === savedDefaults[k]) delete values[k]; });
+  const box = $('params'); box.innerHTML = '';
+  def.params.forEach(p => {
+    if (p.hidden) { // still needs a value carrier (e.g. the logo list), but no visible control
+      const inp = document.createElement('input'); inp.type = 'hidden'; inp.dataset.key = p.key;
+      const v = values[p.key]; inp.value = (p.type === 'text' && typeof v === 'string') ? v : String(p.default); box.appendChild(inp); return;
+    }
+    // saved values are only reused if they are still valid for this param (guards against stale settings)
+    let v = values[p.key];
+    if (v === undefined || (p.type === 'number' && (typeof v !== 'number' || v < p.min || v > p.max)) || (p.type === 'select' && !p.options.some(o => o.value === v)) || (p.type === 'text' && typeof v !== 'string')) v = p.default;
+    const lab = document.createElement('label'); lab.className = 'f' + (p.type === 'boolean' ? ' inline' : '') + (p.basic ? '' : ' adv');
+    lab.style.marginBottom = '10px';
+    let inp;
+    if (p.type === 'select') { inp = document.createElement('select'); p.options.forEach(o => { const op = document.createElement('option'); op.value = o.value; op.textContent = o.label; inp.appendChild(op); }); inp.value = v; }
+    else if (p.type === 'boolean') { inp = document.createElement('input'); inp.type = 'checkbox'; inp.checked = !!v; }
+    else if (p.type === 'text') { inp = document.createElement('input'); inp.type = 'text'; inp.value = typeof v === 'string' ? v : p.default; }
+    else {
+      inp = document.createElement('input'); inp.type = 'number'; inp.min = p.min; inp.max = p.max; inp.step = p.step ?? 1; inp.value = v;
+      const rng = document.createElement('input'); rng.type = 'range'; rng.min = p.min; rng.max = p.max; rng.step = p.step ?? 1; rng.value = v; rng.className = 'prange';
+      rng.addEventListener('input', () => { inp.value = rng.value; inp.dispatchEvent(new Event('input', { bubbles: true })); });
+      inp.addEventListener('input', () => { rng.value = inp.value; });
+      const head = document.createElement('span'); head.className = 'lv'; head.append(document.createTextNode(p.label), inp);
+      inp.style.width = '76px'; inp.style.padding = '3px 6px'; inp.style.textAlign = 'right';
+      inp.dataset.key = p.key;
+      lab.append(head, rng); box.appendChild(lab); return;
+    }
+    inp.dataset.key = p.key;
+    lab.append(document.createTextNode(p.label), inp);
+    box.appendChild(lab);
+  });
+  updateParamsBox();
+}
+function updateParamsBox(){
+  const adv = document.body.classList.contains('advanced');
+  const visible = [...$('params').querySelectorAll('label')].some(l => adv || !l.classList.contains('adv'));
+  $('paramsBox').hidden = !visible;
+  const def = effects.find(e => e.id === $('effect').value); $('paramsTitle').textContent = def ? def.name + ' settings' : 'Effect settings';
+}
+
+/* ---------- stage bridge ---------- */
+function send(msg){ stage.contentWindow.postMessage({ tm: true, ...msg }, '*'); }
+let loadTimer, loopTimer;
+function reload(autoplay = true){
+  if (!stageReady) return;
+  clearTimeout(loadTimer);
+  loadTimer = setTimeout(() => { send({ cmd: 'load', config: readConfig(), autoplay }); fit(); save(); }, 60);
+}
+function fit(){
+  const vp = $('viewport'), w = +$('w').value, h = +$('h').value;
+  const s = Math.min((vp.clientWidth - 56) / w, (vp.clientHeight - 56) / h);
+  frame.style.width = w * s + 'px'; frame.style.height = h * s + 'px';
+  stage.style.width = w + 'px'; stage.style.height = h + 'px'; stage.style.transform = `scale(${s})`;
+}
+addEventListener('resize', fit);
+
+addEventListener('message', e => {
+  const m = e.data; if (!m || !m.tm) return;
+  if (e.source !== stage.contentWindow) return galleryMessage(e);
+  if (m.evt === 'ready') {
+    effects = m.effects; stageReady = true;
+    $('effect').innerHTML = effects.map(x => `<option value="${x.id}">${x.name}</option>`).join('');
+    const s = restore();
+    if (!effects.find(x => x.id === $('effect').value)) $('effect').value = effects[0].id;
+    buildParams($('effect').value, s && s.effect === $('effect').value ? s.params : {}, s && s.effect === $('effect').value ? (s.pdefaults || {}) : {});
+    refreshLogos();
+    applyMode(); showExit(); showVals();
+    reload(false);
+    showGallery();
+  }
+  else if (m.evt === 'loaded') { total = m.total; playing = true; $('play').textContent = '❚❚'; }
+  else if (m.evt === 'time') { curT = m.t; if (!$('logoMgr').hidden) highlightLogo(m.t); $('scrub').value = Math.round(m.t / total * 1000) || 0; $('time').textContent = `${(m.t/1000).toFixed(2)} / ${(total/1000).toFixed(2)} s`; }
+  else if (m.evt === 'ended') { playing = false; $('play').textContent = '▶'; if ($('loop').checked) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { if ($('loop').checked && !playing) $('restart').click(); }, 350); } }
+});
+
+/* ---------- effect gallery (start screen) ---------- */
+const cards = new Map();   // contentWindow -> { id, iframe, loopTimer }
+function galleryConfig(id){
+  const g = effects.find(e => e.id === id), graphic = g && g.kind === 'graphic';
+  return { effect: id, text: $('text').value || 'Sample text', width: 1920, height: 1080, fps: 30, speed: 1, bg: 'transparent',
+    style: { font: $('font').value || 'Archivo', weight: +$('weight').value || 400, size: 260, tracking: -0.016, leading: 0.62, color: graphic ? $('gcolor').value : $('color').value, anchor: 'center-center', x: 120, y: 120, align: 'center' },
+    timing: { preHold: 400, endHold: 1400, exit: 'none' }, params: g && g.params.some(p => p.key === 'tint') ? { tint: 'white' } : {} };   // logos read better in white on the dark card
+}
+function buildGallery(){
+  const box = $('cards'); box.innerHTML = ''; cards.clear();
+  effects.forEach(ef => {
+    const card = document.createElement('div'); card.className = 'card';
+    card.innerHTML = `<div class="pv"><iframe src="/stage.html"></iframe></div><div class="meta"><b>${ef.name}</b><span>${ef.desc || ''}</span></div>`;
+    const ifr = card.querySelector('iframe');
+    card.onclick = () => openEditor(ef.id);
+    box.appendChild(card);
+    cards.set(ifr, { id: ef.id, iframe: ifr, loopTimer: null });
+  });
+  fitCards();
+}
+function fitCards(){ document.querySelectorAll('.card .pv').forEach(pv => { const s = pv.clientWidth / 1920; pv.querySelector('iframe').style.transform = `scale(${s})`; }); }
+addEventListener('resize', fitCards);
+function cardOf(win){ for (const c of cards.values()) if (c.iframe.contentWindow === win) return c; return null; }
+function galleryMessage(e){
+  const c = cardOf(e.source); if (!c) return; const m = e.data;
+  if (m.evt === 'ready') e.source.postMessage({ tm: true, cmd: 'load', config: galleryConfig(c.id), autoplay: !$('gallery').hidden }, '*');
+  else if (m.evt === 'ended' && !$('gallery').hidden) { clearTimeout(c.loopTimer); c.loopTimer = setTimeout(() => { if (!$('gallery').hidden) e.source.postMessage({ tm: true, cmd: 'play', from: 0 }, '*'); }, 700); }
+}
+function showGallery(){
+  $('gallery').hidden = false; document.body.classList.add('gallery');
+  send({ cmd: 'pause' }); playing = false; $('play').textContent = '▶';
+  if (!cards.size) buildGallery();
+  else cards.forEach(c => { c.iframe.contentWindow.postMessage({ tm: true, cmd: 'load', config: galleryConfig(c.id), autoplay: true }, '*'); });
+}
+function openEditor(id){
+  $('gallery').hidden = true; document.body.classList.remove('gallery');
+  cards.forEach(c => { clearTimeout(c.loopTimer); c.iframe.contentWindow.postMessage({ tm: true, cmd: 'pause' }, '*'); });
+  if (id && id !== $('effect').value) { $('effect').value = id; buildParams(id); applyMode(); }
+  fit(); reload();
+}
+$('backBtn').onclick = () => showGallery();
+
+/* ---------- controls ---------- */
+function isGraphic(){ const d = effects.find(e => e.id === $('effect').value); return !!(d && d.kind === 'graphic'); }
+function applyMode(){
+  const g = isGraphic();
+  document.querySelectorAll('.textonly').forEach(el => el.hidden = g);
+  document.querySelectorAll('.graphiconly').forEach(el => el.hidden = !g);
+  $('name').placeholder = g ? 'Defaults to the effect name' : 'Defaults to the text';
+  renderLogoList();
+}
+$('advanced').onchange = () => { document.body.classList.toggle('advanced', $('advanced').checked); updateParamsBox(); try { localStorage.setItem('text-motion:advanced', $('advanced').checked ? '1' : ''); } catch {} };
+try { if (localStorage.getItem('text-motion:advanced')) { $('advanced').checked = true; document.body.classList.add('advanced'); } } catch {}
+$('effect').onchange = () => { buildParams($('effect').value); applyMode(); reload(); };
+function showExit(){ const on = $('exit').value === 'reverse'; $('holdBox').hidden = !on; $('exitSpeedBox').hidden = !on; }
+$('exit').addEventListener('change', showExit);
+
+/* ---------- logo manager (shown for effects that have a `logos` param) ---------- */
+let logoLib = [];
+function logosParamEl(){ return document.querySelector('#params [data-key="logos"]'); }
+function usedLogos(){ const el = logosParamEl(); return el ? el.value.split(',').map(x => x.trim()).filter(Boolean) : []; }
+function setUsedLogos(list){ const el = logosParamEl(); if (!el) return; el.value = list.join(','); el.dispatchEvent(new Event('input', { bubbles: true })); renderLogoList(); }
+async function refreshLogos(){
+  try { const r = await fetch('/api/logos'); if (!r.ok) throw new Error(r.status); logoLib = await r.json(); $('serverBanner').hidden = true; }
+  catch { logoLib = []; $('serverBanner').hidden = false; }
+  renderLogoList();
+}
+function renderLogoList(){
+  const box = $('logoMgr'); const has = !!logosParamEl(); box.hidden = !has; if (!has) return;
+  const used = usedLogos().filter(n => logoLib.some(l => l.name === n));
+  const rest = logoLib.map(l => l.name).filter(n => !used.includes(n));
+  const ul = $('logoList'); ul.innerHTML = '';
+  [...used, ...rest].forEach((name, i) => {
+    const on = i < used.length; const li = document.createElement('li'); li.className = on ? '' : 'off';
+    const l = logoLib.find(x => x.name === name) || {};
+    li.dataset.i = on ? i : -1;
+    li.innerHTML = `<span class="num">${on ? i + 1 : ''}</span><input type="checkbox" ${on ? 'checked' : ''} title="Use in roll"><span class="th"><img src="/assets/logos/${encodeURIComponent(name)}.png?${Math.round(l.mtime || 0)}"></span><span class="nm" title="${name}">${name}</span>` +
+      (on ? `<button data-a="up" title="Move up">▲</button><button data-a="down" title="Move down">▼</button>` : '') + `<button data-a="del" title="Delete file">×</button>`;
+    li.querySelector('input').onchange = e => setUsedLogos(e.target.checked ? [...used, name] : used.filter(n => n !== name));
+    // click a row → jump the preview to the moment this logo is centred
+    li.onclick = e => { if (e.target.closest('button,input')) return; if (!on) return; const t = logoTime(i); if (t != null) { send({ cmd: 'seek', t }); playing = false; $('play').textContent = '▶'; } };
+    li.querySelectorAll('button').forEach(b => b.onclick = async () => {
+      const a = b.dataset.a, j = used.indexOf(name);
+      if (a === 'up' && j > 0) { const u = [...used]; [u[j-1], u[j]] = [u[j], u[j-1]]; setUsedLogos(u); }
+      else if (a === 'down' && j < used.length - 1) { const u = [...used]; [u[j+1], u[j]] = [u[j], u[j+1]]; setUsedLogos(u); }
+      else if (a === 'del') { if (!confirm(`Delete "${name}.png" from the logos folder?`)) return; await fetch('/api/logos/' + encodeURIComponent(name), { method: 'DELETE' }); await refreshLogos(); setUsedLogos(used.filter(n => n !== name)); }
+    });
+    ul.appendChild(li);
+  });
+}
+function rollTiming(){
+  const g = k => { const el = document.querySelector(`#params [data-key="${k}"]`); return el ? +el.value : NaN; };
+  const lead = g('lead'), hold = g('hold'), move = g('move'); if ([lead, hold, move].some(isNaN)) return null;
+  return { lead, hold, move, step: hold + move, speed: +$('speed').value || 1, pre: +$('preHold').value };
+}
+function logoTime(i){ const r = rollTiming(); if (!r) return null; return r.pre + (r.lead + i * r.step + r.hold / 2) / r.speed; }
+function highlightLogo(t){
+  const r = rollTiming(); if (!r) return;
+  const local = (t - r.pre) * r.speed, idx = Math.round((local - r.lead) / r.step);
+  document.querySelectorAll('#logoList li').forEach(li => li.classList.toggle('now', +li.dataset.i === idx));
+}
+// Prepare an uploaded image in the browser: remove a flat white/black background, crop to content, cap size.
+async function prepareLogo(file){
+  const bmp = await createImageBitmap(file); const MAX = 2000, sc = Math.min(1, MAX / Math.max(bmp.width, bmp.height));
+  const w = Math.max(1, Math.round(bmp.width * sc)), h = Math.max(1, Math.round(bmp.height * sc));
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(bmp, 0, 0, w, h);
+  const im = g.getImageData(0, 0, w, h), d = im.data;
+  // sample the border to decide what the background is
+  let opaque = 0, lum = 0, n = 0;
+  const samp = (x, y) => { const k = (y * w + x) * 4; n++; if (d[k+3] > 250) { opaque++; lum += (d[k] + d[k+1] + d[k+2]) / 3; } };
+  for (let x = 0; x < w; x += Math.max(1, w >> 6)) { samp(x, 0); samp(x, h - 1); }
+  for (let y = 0; y < h; y += Math.max(1, h >> 6)) { samp(0, y); samp(w - 1, y); }
+  const hasBg = opaque / n > 0.9, avg = opaque ? lum / opaque : 0;
+  if (hasBg && avg > 200) {            // white background → alpha from darkness (keeps anti-aliasing and colour)
+    for (let k = 0; k < d.length; k += 4) { const mn = Math.min(d[k], d[k+1], d[k+2]); const a = 1 - mn / 255; if (a <= 0.004) { d[k+3] = 0; continue; }
+      for (let c2 = 0; c2 < 3; c2++) d[k+c2] = Math.max(0, Math.min(255, 255 - (255 - d[k+c2]) / a)); d[k+3] = Math.round(a * 255); }
+  } else if (hasBg && avg < 55) {      // black background → alpha from brightness
+    for (let k = 0; k < d.length; k += 4) { const mx = Math.max(d[k], d[k+1], d[k+2]); const a = mx / 255; if (a <= 0.004) { d[k+3] = 0; continue; }
+      for (let c2 = 0; c2 < 3; c2++) d[k+c2] = Math.max(0, Math.min(255, d[k+c2] / a)); d[k+3] = Math.round(a * 255); }
+  }
+  // crop to content
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) throw new Error('image is empty after background removal');
+  g.putImageData(im, 0, 0);
+  const out = document.createElement('canvas'); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
+  out.getContext('2d').drawImage(c, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+  return out.toDataURL('image/png');
+}
+async function addLogoFiles(files){
+  const added = [];
+  for (const f of files) {
+    try { const data = await prepareLogo(f); const name = f.name.replace(/\.[^.]+$/, '');
+      const res = await fetch('/api/logos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, data }) });
+      if (!res.ok) throw new Error(res.status === 404 ? 'server needs a restart' : 'upload failed (' + res.status + ')');
+      const r = await res.json(); if (r.name) added.push(r.name); } catch (e) { $('status').textContent = `Could not add ${f.name}: ${e.message}`; $('serverBanner').hidden = !/restart/.test(e.message); }
+  }
+  await refreshLogos(); if (added.length) setUsedLogos([...usedLogos().filter(n => !added.includes(n)), ...added]);
+}
+$('logoDrop').onclick = () => $('logoFile').click();
+$('logoFile').onchange = e => { addLogoFiles([...e.target.files]); e.target.value = ''; };
+$('logoDrop').ondragover = e => { e.preventDefault(); $('logoDrop').classList.add('over'); };
+$('logoDrop').ondragleave = () => $('logoDrop').classList.remove('over');
+$('logoDrop').ondrop = e => { e.preventDefault(); $('logoDrop').classList.remove('over'); addLogoFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/'))); };
+$('params').addEventListener('input', () => reload());
+document.querySelectorAll('aside.left input, aside.left select, aside.left textarea').forEach(el => el.addEventListener('input', () => reload()));
+['w','h','fps'].forEach(id => $(id).addEventListener('input', () => reload(false)));
+$('preset').onchange = e => { const v = e.target.value; $('customSize').hidden = v !== 'custom'; if (v !== 'custom') { const [w,h] = v.split('x'); $('w').value = w; $('h').value = h; } reload(false); };
+function setExportLabel(){ $('export').textContent = { prores4444: 'Export .mov', png: 'Export PNG sequence', mp4: 'Export .mp4' }[$('format').value]; }
+$('format').onchange = () => { setExportLabel(); save(); };
+function showVals(){ document.querySelectorAll('.sv').forEach(b => { const el = $(b.dataset.for); if (!el) return; const st = +el.step || 1; const dec = st < 0.01 ? 3 : st < 0.1 ? 2 : st < 1 ? 1 : 0; b.textContent = (+el.value).toFixed(dec) + (b.dataset.unit || ''); }); }
+document.querySelectorAll('.sv').forEach(b => { const el = $(b.dataset.for); if (el) el.addEventListener('input', showVals); });
+showVals();
+function setVpos(v, doReload = true){ $('vpos').value = v; document.querySelectorAll('#vposSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); if (doReload) reload(); }
+document.querySelectorAll('#vposSeg button').forEach(b => b.onclick = () => setVpos(b.dataset.v));
+
+function showSpeed(){ $('speedV').textContent = (+$('speed').value).toFixed(2) + '×'; }
+$('speed').addEventListener('input', () => { showSpeed(); reload(); });
+$('speed').addEventListener('dblclick', () => { $('speed').value = 1; showSpeed(); reload(); });
+
+$('play').onclick = () => { if (playing) { send({ cmd: 'pause' }); playing = false; $('play').textContent = '▶'; } else { send({ cmd: 'play', from: curT >= total ? 0 : curT }); playing = true; $('play').textContent = '❚❚'; } };
+$('restart').onclick = () => { send({ cmd: 'play', from: 0 }); playing = true; $('play').textContent = '❚❚'; };
+$('scrub').oninput = e => { send({ cmd: 'seek', t: e.target.value / 1000 * total }); playing = false; $('play').textContent = '▶'; };
+function setAlign(v, doReload = true){ $('align').value = v; document.querySelectorAll('#alignPill button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); if (doReload) reload(); }
+document.querySelectorAll('#alignPill button').forEach(b => b.onclick = () => setAlign(b.dataset.v));
+document.querySelectorAll('#bgPill button').forEach(b => b.onclick = () => { document.querySelectorAll('#bgPill button').forEach(x => x.classList.remove('on')); b.classList.add('on'); frame.className = b.dataset.bg; });
+addEventListener('keydown', e => { if (e.code === 'Space' && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.preventDefault(); $('play').click(); } });
+
+/* ---------- fonts ---------- */
+const WEIGHT_NAMES = { 100:'Thin', 200:'ExtraLight', 300:'Light', 400:'Regular', 500:'Medium', 600:'SemiBold', 700:'Bold', 800:'ExtraBold', 900:'Black' };
+let fontList = [];
+function fillStyles(keep){
+  const fam = fontList.find(f => f.family === $('font').value);
+  // works with an older server that doesn't send weights yet
+  const ws = fam && Array.isArray(fam.weights) && fam.weights.length ? fam.weights : (fam && fam.variable ? [100,200,300,400,500,600,700,800,900] : [400]);
+  const cur = keep ?? +$('weight').value;
+  $('weight').innerHTML = ws.map(w => `<option value="${w}">${WEIGHT_NAMES[w] || w}</option>`).join('');
+  $('weight').value = ws.includes(cur) ? cur : (ws.includes(400) ? 400 : ws[0]);
+}
+fetch('/api/fonts').then(r => r.json()).then(list => {
+  fontList = list;
+  $('font').innerHTML = list.map(f => `<option value="${f.family}">${f.family}</option>`).join('');
+  const s = (() => { try { return JSON.parse(localStorage.getItem(STORE)); } catch { return null; } })();
+  if (s && s.style && list.find(f => f.family === s.style.font)) $('font').value = s.style.font;
+  fillStyles(s && s.style ? +s.style.weight : 400);
+  reload($('gallery').hidden);
+});
+$('font').addEventListener('change', () => { fillStyles(400); reload(); });
+
+/* ---------- export ---------- */
+async function refreshExports(){ return; /* list removed — the result line + Show in Finder replaces it */
+  const list = await fetch('/api/exports').then(r => r.json()).catch(() => []);
+  $('exports').innerHTML = list.slice(0, 5).map(f => `<li><a href="/exports/${encodeURIComponent(f.name)}" target="_blank" title="${f.name}">${f.name}</a><span>${f.size ? (f.size/1048576).toFixed(1) + ' MB' : ''}</span></li>`).join('') || '<li><span>Nothing yet</span></li>';
+}
+refreshExports();
+$('openExports').onclick = e => { e.preventDefault(); fetch('/api/reveal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); };
+$('export').onclick = async () => {
+  const btn = $('export'); btn.disabled = true;
+  const prog = $('progress'), bar = prog.querySelector('i'); prog.style.display = 'block'; bar.style.width = '0';
+  $('status').textContent = 'Starting…';
+  send({ cmd: 'pause' }); playing = false; $('play').textContent = '▶';   // free up CPU for the render
+  const format = $('format').value;
+  const { id } = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config: readConfig(), format, name: $('name').value.trim() || (isGraphic() ? $('effect').selectedOptions[0].textContent : '') }) }).then(r => r.json());
+  const tick = async () => {
+    const j = await fetch('/api/export/' + id).then(r => r.json());
+    if (j.status === 'rendering') { bar.style.width = (j.frame / j.frames * 100) + '%'; $('status').textContent = `Rendering frame ${j.frame} / ${j.frames}`; }
+    else if (j.status === 'encoding') { bar.style.width = '100%'; $('status').textContent = 'Encoding…'; }
+    if (j.status === 'done') {
+      $('status').innerHTML = ''; const nm = document.createElement('span'); nm.textContent = `Done · ${j.file}`; nm.style.cssText = 'display:block;color:var(--text);margin-bottom:6px;word-break:break-all';
+      const rv = document.createElement('button'); rv.textContent = 'Show in Finder'; rv.style.cssText = 'font-size:12px;padding:5px 10px';
+      rv.onclick = () => fetch('/api/reveal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: j.file }) });
+      $('status').append(nm, rv); btn.disabled = false; return; }
+    if (j.status === 'error') { $('status').textContent = 'Error: ' + j.error; btn.disabled = false; return; }
+    setTimeout(tick, 300);
+  };
+  tick();
+};
+</script>
+</body>
+</html>
