@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import ffmpegStatic from 'ffmpeg-static';
 import crypto from 'node:crypto';
+import os from 'node:os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 5173;
@@ -126,7 +127,7 @@ async function getBrowser() {
   if (!browser || !browser.isConnected()) browser = await chromium.launch({
     executablePath: process.env.CHROMIUM || undefined,
     // containers usually run as root with a small /dev/shm; both flags are needed there and harmless locally
-    args: HOSTED ? ['--no-sandbox', '--disable-dev-shm-usage'] : [],
+    args: HOSTED ? ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--renderer-process-limit=1', '--js-flags=--max-old-space-size=256'] : [],
   });
   return browser;
 }
@@ -192,36 +193,45 @@ async function runExport(job, config, format, name) {
   job.frames = frames; job.status = 'rendering';
 
   const outFile = format === 'png' ? null : path.join(EXPORTS, base + (format === 'mp4' ? '.mp4' : '.mov'));
-  let ff = null, pngDir = null;
-  if (format === 'png') { pngDir = path.join(EXPORTS, base); fs.mkdirSync(pngDir, { recursive: true }); }
-  else {
-    // In a container ffmpeg sees the host's core count (often 32+), spawns that many frame threads and gets
-    // OOM-killed. FFMPEG_THREADS caps it (default 2 when hosted, auto on a Mac).
-    const THREADS = process.env.FFMPEG_THREADS || (HOSTED ? '2' : '0');
-    const args = ['-y', '-threads', THREADS, '-f', 'image2pipe', '-framerate', String(fps), '-i', '-'];
-    // Rec.709 / video-range conversion + colr tags: without these, Premiere/AE/QuickTime guess the colour space and
-    // range of the file, and a pure white can come out slightly grey (or the gamma lifted) on top of footage
-    const COLR = ['-vf', 'scale=out_color_matrix=bt709:out_range=tv', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-color_range', 'tv', '-movflags', '+write_colr'];
+  // In a container ffmpeg sees the host's core count (often 32+), spawns that many frame threads and gets
+  // OOM-killed. FFMPEG_THREADS caps it (default 1 when hosted, auto on a Mac).
+  const THREADS = process.env.FFMPEG_THREADS || (HOSTED ? '1' : '0');
+  // Rec.709 / video-range conversion + colr tags: without these, Premiere/AE/QuickTime guess the colour space and
+  // range of the file, and a pure white can come out slightly grey (or the gamma lifted) on top of footage
+  const COLR = ['-vf', 'scale=out_color_matrix=bt709:out_range=tv', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-color_range', 'tv', '-movflags', '+write_colr'];
+  const encodeArgs = inputArgs => {
+    const args = ['-y', '-threads', THREADS, ...inputArgs];
     if (format === 'prores4444') args.push('-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le', '-vendor', 'apl0', '-bits_per_mb', '8000', '-threads', THREADS, ...COLR);
     else if (format === 'mp4') args.push('-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium', '-threads', THREADS, ...COLR.slice(0, -2), '-movflags', '+faststart+write_colr');
     args.push('-r', String(fps), outFile);
-    ff = spawn(FFMPEG, args, { stdio: ['pipe', 'ignore', 'pipe'] });
+    return args;
+  };
+  const spawnFf = (args, stdin) => {
+    const p = spawn(FFMPEG, args, { stdio: [stdin ? 'pipe' : 'ignore', 'ignore', 'pipe'] });
     let errLog = '';
-    ff.stderr.on('data', d => { errLog += d; if (errLog.length > 20000) errLog = errLog.slice(-20000); });
-    ff.on('error', e => { job.error = 'ffmpeg: ' + e.message; });
+    p.stderr.on('data', d => { errLog += d; if (errLog.length > 20000) errLog = errLog.slice(-20000); });
+    p.on('error', e => { job.error = 'ffmpeg: ' + e.message; });
     // if ffmpeg dies mid-render the next stdin write raises EPIPE — without this handler it takes the whole server down
-    ff.__exited = null;
-    ff.on('close', (code, signal) => { ff.__exited = { code, signal }; });
-    ff.stdin.on('error', e => { console.error('ffmpeg stdin:', e.message); });
-    ff.__log = () => errLog;
-  }
+    p.__exited = null;
+    p.on('close', (code, signal) => { p.__exited = { code, signal }; });
+    if (stdin) p.stdin.on('error', e => { console.error('ffmpeg stdin:', e.message); });
+    p.__log = () => errLog;
+    return p;
+  };
+  // Hosted (small RAM): two phases — capture every frame to a temp folder, shut Chromium down, then encode from disk.
+  // Local Mac: stream frames straight into ffmpeg (faster, RAM is plentiful).
+  const twoPhase = HOSTED && format !== 'png';
+  let ff = null, pngDir = null, tmpDir = null;
+  if (format === 'png') { pngDir = path.join(EXPORTS, base); fs.mkdirSync(pngDir, { recursive: true }); }
+  else if (twoPhase) { tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-')); pngDir = tmpDir; }
+  else ff = spawnFf(encodeArgs(['-f', 'image2pipe', '-framerate', String(fps), '-i', '-']), true);
 
   for (let i = 0; i < frames; i++) {
     const t = Math.min(total, i * 1000 / fps);
     await page.evaluate(t => { window.TM_seek(t); return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); }, t);
     const shot = await cdp.send('Page.captureScreenshot', { format: 'png', optimizeForSpeed: true });
     const png = Buffer.from(shot.data, 'base64');
-    if (pngDir) fs.writeFileSync(path.join(pngDir, `${base}_${String(i).padStart(5, '0')}.png`), png);
+    if (pngDir) fs.writeFileSync(path.join(pngDir, `${tmpDir ? 'f' : base + '_'}${String(i).padStart(5, '0')}.png`), png);
     else {
       if (ff.__exited) { await page.close(); throw new Error(`ffmpeg exited early (code ${ff.__exited.code}, signal ${ff.__exited.signal}) at frame ${i}\n` + ff.__log().slice(-3000)); }
       if (!ff.stdin.write(png)) await new Promise(r => { const done = () => { ff.stdin.off('close', done); r(); }; ff.stdin.once('drain', done); ff.stdin.once('close', done); });
@@ -229,6 +239,17 @@ async function runExport(job, config, format, name) {
     job.frame = i + 1;
   }
   await page.close();
+
+  if (twoPhase) {
+    // free Chromium's memory before ffmpeg starts
+    try { await b.close(); } catch {} browser = null;
+    job.status = 'encoding';
+    const enc = spawnFf(encodeArgs(['-f', 'image2', '-framerate', String(fps), '-i', path.join(tmpDir, 'f%05d.png')]), false);
+    const code = await new Promise(r => enc.on('close', r));
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (code !== 0) throw new Error('ffmpeg exited ' + code + (enc.__exited && enc.__exited.signal ? ' signal ' + enc.__exited.signal : '') + '\n' + enc.__log().slice(-3000));
+    job.status = 'done'; job.file = path.basename(outFile); return;
+  }
 
   if (ff) {
     job.status = 'encoding';
