@@ -155,7 +155,7 @@ app.post('/api/export', async (req, res) => {
   jobs.set(id, job);
   res.json({ id });
   job.status = 'queued';
-  enqueue(() => runExport(job, config, format, name)).catch(err => { job.status = 'error'; job.error = String(err && err.stack || err); console.error(err); });
+  enqueue(() => runExport(job, config, format, name)).catch(err => { job.status = 'error'; job.error = String(err && (err.stack || err.message) || err || 'unknown error'); console.error('[export]', job.error); });
 });
 app.get('/api/export/:id', (req, res) => res.json(jobs.get(req.params.id) || { status: 'unknown' }));
 app.get('/api/exports', (req, res) => {
@@ -206,6 +206,10 @@ async function runExport(job, config, format, name) {
     let errLog = '';
     ff.stderr.on('data', d => { errLog += d; if (errLog.length > 20000) errLog = errLog.slice(-20000); });
     ff.on('error', e => { job.error = 'ffmpeg: ' + e.message; });
+    // if ffmpeg dies mid-render the next stdin write raises EPIPE — without this handler it takes the whole server down
+    ff.__exited = null;
+    ff.on('close', (code, signal) => { ff.__exited = { code, signal }; });
+    ff.stdin.on('error', e => { console.error('ffmpeg stdin:', e.message); });
     ff.__log = () => errLog;
   }
 
@@ -215,7 +219,10 @@ async function runExport(job, config, format, name) {
     const shot = await cdp.send('Page.captureScreenshot', { format: 'png', optimizeForSpeed: true });
     const png = Buffer.from(shot.data, 'base64');
     if (pngDir) fs.writeFileSync(path.join(pngDir, `${base}_${String(i).padStart(5, '0')}.png`), png);
-    else if (!ff.stdin.write(png)) await new Promise(r => ff.stdin.once('drain', r));
+    else {
+      if (ff.__exited) { await page.close(); throw new Error(`ffmpeg exited early (code ${ff.__exited.code}, signal ${ff.__exited.signal}) at frame ${i}\n` + ff.__log().slice(-3000)); }
+      if (!ff.stdin.write(png)) await new Promise(r => { const done = () => { ff.stdin.off('close', done); r(); }; ff.stdin.once('drain', done); ff.stdin.once('close', done); });
+    }
     job.frame = i + 1;
   }
   await page.close();
@@ -223,8 +230,8 @@ async function runExport(job, config, format, name) {
   if (ff) {
     job.status = 'encoding';
     ff.stdin.end();
-    const code = await new Promise(r => ff.on('close', r));
-    if (code !== 0) throw new Error('ffmpeg exited ' + code + '\n' + ff.__log());
+    const code = ff.__exited ? ff.__exited.code : await new Promise(r => ff.on('close', r));
+    if (code !== 0) throw new Error('ffmpeg exited ' + code + (ff.__exited && ff.__exited.signal ? ' signal ' + ff.__exited.signal : '') + '\n' + ff.__log().slice(-3000));
   }
   // hosted: a folder can't be downloaded, so zip the PNG sequence (needs the `zip` binary — see Dockerfile)
   if (pngDir && HOSTED) {
