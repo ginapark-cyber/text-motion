@@ -195,12 +195,15 @@ async function runExport(job, config, format, name) {
   let ff = null, pngDir = null;
   if (format === 'png') { pngDir = path.join(EXPORTS, base); fs.mkdirSync(pngDir, { recursive: true }); }
   else {
-    const args = ['-y', '-f', 'image2pipe', '-framerate', String(fps), '-i', '-'];
+    // In a container ffmpeg sees the host's core count (often 32+), spawns that many frame threads and gets
+    // OOM-killed. FFMPEG_THREADS caps it (default 2 when hosted, auto on a Mac).
+    const THREADS = process.env.FFMPEG_THREADS || (HOSTED ? '2' : '0');
+    const args = ['-y', '-threads', THREADS, '-f', 'image2pipe', '-framerate', String(fps), '-i', '-'];
     // Rec.709 / video-range conversion + colr tags: without these, Premiere/AE/QuickTime guess the colour space and
     // range of the file, and a pure white can come out slightly grey (or the gamma lifted) on top of footage
     const COLR = ['-vf', 'scale=out_color_matrix=bt709:out_range=tv', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-color_range', 'tv', '-movflags', '+write_colr'];
-    if (format === 'prores4444') args.push('-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le', '-vendor', 'apl0', '-bits_per_mb', '8000', ...COLR);
-    else if (format === 'mp4') args.push('-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium', ...COLR.slice(0, -2), '-movflags', '+faststart+write_colr');
+    if (format === 'prores4444') args.push('-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le', '-vendor', 'apl0', '-bits_per_mb', '8000', '-threads', THREADS, ...COLR);
+    else if (format === 'mp4') args.push('-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium', '-threads', THREADS, ...COLR.slice(0, -2), '-movflags', '+faststart+write_colr');
     args.push('-r', String(fps), outFile);
     ff = spawn(FFMPEG, args, { stdio: ['pipe', 'ignore', 'pipe'] });
     let errLog = '';
