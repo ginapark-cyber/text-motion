@@ -217,12 +217,15 @@ async function runExport(job, config, format, name) {
   // In a container ffmpeg sees the host's core count (often 32+), spawns that many frame threads and gets
   // OOM-killed. FFMPEG_THREADS caps it (default 1 when hosted, auto on a Mac).
   const THREADS = process.env.FFMPEG_THREADS || (HOSTED ? '1' : '0');
+  // prores_ks allocates its packet buffer from bits_per_mb; 8000 (well above ProRes 4444 spec) needs >1 GB at 4K and
+  // gets OOM-killed on a 1 GB container. 2000 is still above the 4444 target rate and fits. PRORES_BPM overrides.
+  const BPM = process.env.PRORES_BPM || (HOSTED ? '2000' : '8000');
   // Rec.709 / video-range conversion + colr tags: without these, Premiere/AE/QuickTime guess the colour space and
   // range of the file, and a pure white can come out slightly grey (or the gamma lifted) on top of footage
   const COLR = ['-vf', 'scale=out_color_matrix=bt709:out_range=tv', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-color_range', 'tv', '-movflags', '+write_colr'];
   const encodeArgs = inputArgs => {
     const args = ['-y', '-threads', THREADS, ...inputArgs];
-    if (format === 'prores4444') args.push('-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le', '-vendor', 'apl0', '-bits_per_mb', '8000', '-threads', THREADS, ...COLR);
+    if (format === 'prores4444') args.push('-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le', '-vendor', 'apl0', '-bits_per_mb', BPM, '-threads', THREADS, ...COLR);
     else if (format === 'mp4') args.push('-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium', '-threads', THREADS, ...COLR.slice(0, -2), '-movflags', '+faststart+write_colr');
     args.push('-r', String(fps), outFile);
     return args;
