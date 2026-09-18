@@ -67,7 +67,10 @@ app.get('/api/debug/enc', (req, res) => {
   const args = ['-y', '-threads', th, '-f', 'lavfi', '-i', `color=c=white@0.5:s=${w}x${h}:r=30:d=${n / 30}`, '-pix_fmt', 'rgba', '-f', 'rawvideo', '-'];
   // pipe rgba frames into the same encoder command the export uses
   const gen = spawn(FFMPEG, args, { stdio: ['ignore', 'pipe', 'ignore'] });
-  const encArgs = ['-y', '-threads', th, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${w}x${h}`, '-r', '30', '-i', '-', '-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le', '-vendor', 'apl0', '-bits_per_mb', '8000', '-threads', th, '-vf', 'scale=out_color_matrix=bt709:out_range=tv', '-f', 'null', '-'];
+  const codec = req.query.enc === 'aw' ? 'prores_aw' : 'prores_ks';
+  const encArgs = ['-y', '-threads', th, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${w}x${h}`, '-r', '30', '-i', '-', '-c:v', codec, '-profile:v', '4444', '-pix_fmt', 'yuva444p10le', '-vendor', 'apl0', '-threads', th, '-vf', 'scale=out_color_matrix=bt709:out_range=tv', '-f', 'null', '-'];
+  if (codec === 'prores_ks') encArgs.splice(encArgs.indexOf('-threads', 3), 0, '-bits_per_mb', String(req.query.bpm || 8000));
+  if (req.query.slices) encArgs.splice(encArgs.indexOf('-vf'), 0, '-slices', String(+req.query.slices || 1));
   if (req.query.simple) encArgs.splice(encArgs.indexOf('-vf'), 2);
   const enc = spawn(FFMPEG, encArgs, { stdio: ['pipe', 'ignore', 'pipe'] });
   let log = ''; enc.stderr.on('data', d => { log += d; if (log.length > 4000) log = log.slice(-4000); });
