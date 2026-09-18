@@ -529,6 +529,13 @@ let HOSTED = false;
 fetch('/api/env').then(r => r.json()).then(e => {
   HOSTED = !!e.hosted;
   if (HOSTED) $('exportHint').textContent = 'Transparent background · the file downloads to your computer when the render finishes';
+  if (e.allow4k === false) {
+    // server can't render above FHD (small hosting plan): hide the big presets and force FHD
+    [...$('preset').options].forEach(o => { const [w, h] = o.value.split('x').map(Number); if (w * h > 1920 * 1080) o.hidden = o.disabled = true; });
+    const cur = $('preset').value, [cw, ch] = cur === 'custom' ? [+$('w').value, +$('h').value] : cur.split('x').map(Number);
+    if (cw * ch > 1920 * 1080) { $('preset').value = '1920x1080'; $('preset').dispatchEvent(new Event('change')); save(); }
+    $('exportHint').textContent += ' · FHD max on this server';
+  }
 }).catch(() => {});
 $('openExports').onclick = e => { e.preventDefault(); fetch('/api/reveal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); };
 $('export').onclick = async () => {
@@ -537,7 +544,8 @@ $('export').onclick = async () => {
   $('status').textContent = 'Starting…';
   send({ cmd: 'pause' }); playing = false; $('play').textContent = '▶';   // free up CPU for the render
   const format = $('format').value;
-  const { id } = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config: readConfig(), format, name: $('name').value.trim() || (isGraphic() ? $('effect').selectedOptions[0].textContent : '') }) }).then(r => r.json());
+  const { id, error } = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config: readConfig(), format, name: $('name').value.trim() || (isGraphic() ? $('effect').selectedOptions[0].textContent : '') }) }).then(r => r.json());
+  if (error) { $('status').textContent = 'Error: ' + error; prog.style.display = 'none'; btn.disabled = false; return; }
   const tick = async () => {
     const j = await fetch('/api/export/' + id).then(r => r.json());
     if (j.status === 'queued') { $('status').textContent = 'Waiting for another export to finish…'; }

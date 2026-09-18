@@ -56,7 +56,9 @@ if (APP_PASSWORD) app.use((req, res, next) => {
   res.status(401).type('html').send(LOGIN_HTML.replace('__MSG__', ''));
 });
 
-app.get('/api/env', (req, res) => res.json({ hosted: HOSTED }));
+// ALLOW_4K=0 hides the 4K / square presets and rejects >FHD exports (for small-RAM hosting plans). Unset = allowed.
+const ALLOW_4K = process.env.ALLOW_4K !== '0';
+app.get('/api/env', (req, res) => res.json({ hosted: HOSTED, allow4k: ALLOW_4K }));
 // container diagnostics (memory limit/usage, mounts) — handy when a render gets OOM-killed
 const readNum = f => { try { return fs.readFileSync(f, 'utf8').trim(); } catch { return null; } };
 const memInfo = () => ({ cgroupMax: readNum('/sys/fs/cgroup/memory.max') || readNum('/sys/fs/cgroup/memory/memory.limit_in_bytes'), cgroupCurrent: readNum('/sys/fs/cgroup/memory.current') || readNum('/sys/fs/cgroup/memory/memory.usage_in_bytes'), peak: readNum('/sys/fs/cgroup/memory.peak'), events: (readNum('/sys/fs/cgroup/memory.events') || '').replace(/\n/g, ' '), rss: process.memoryUsage().rss });
@@ -154,6 +156,7 @@ function slug(s) { return s.replace(/\s+/g, '-').replace(/[^\w\-가-힣]/g, '').
 
 app.post('/api/export', async (req, res) => {
   const { config, format = 'prores4444', name } = req.body;
+  if (!ALLOW_4K && config && config.width * config.height > 1920 * 1080) return res.status(400).json({ error: 'Exports above FHD (1920×1080) are turned off on this server for now.' });
   const id = Date.now().toString(36);
   const job = { id, status: 'starting', frame: 0, frames: 0, file: null, error: null };
   jobs.set(id, job);
