@@ -59,7 +59,22 @@ if (APP_PASSWORD) app.use((req, res, next) => {
 app.get('/api/env', (req, res) => res.json({ hosted: HOSTED }));
 // container diagnostics (memory limit/usage, mounts) — handy when a render gets OOM-killed
 const readNum = f => { try { return fs.readFileSync(f, 'utf8').trim(); } catch { return null; } };
-const memInfo = () => ({ cgroupMax: readNum('/sys/fs/cgroup/memory.max') || readNum('/sys/fs/cgroup/memory/memory.limit_in_bytes'), cgroupCurrent: readNum('/sys/fs/cgroup/memory.current') || readNum('/sys/fs/cgroup/memory/memory.usage_in_bytes'), rss: process.memoryUsage().rss });
+const memInfo = () => ({ cgroupMax: readNum('/sys/fs/cgroup/memory.max') || readNum('/sys/fs/cgroup/memory/memory.limit_in_bytes'), cgroupCurrent: readNum('/sys/fs/cgroup/memory.current') || readNum('/sys/fs/cgroup/memory/memory.usage_in_bytes'), peak: readNum('/sys/fs/cgroup/memory.peak'), events: (readNum('/sys/fs/cgroup/memory.events') || '').replace(/\n/g, ' '), rss: process.memoryUsage().rss });
+// synthetic encode test: /api/debug/enc?w=3840&h=2160&n=10&threads=1 — runs prores_ks on generated frames, reports exit + memory
+app.get('/api/debug/enc', (req, res) => {
+  const w = +req.query.w || 3840, h = +req.query.h || 2160, n = +req.query.n || 10, th = String(req.query.threads || '1');
+  const before = memInfo();
+  const args = ['-y', '-threads', th, '-f', 'lavfi', '-i', `color=c=white@0.5:s=${w}x${h}:r=30:d=${n / 30}`, '-pix_fmt', 'rgba', '-f', 'rawvideo', '-'];
+  // pipe rgba frames into the same encoder command the export uses
+  const gen = spawn(FFMPEG, args, { stdio: ['ignore', 'pipe', 'ignore'] });
+  const encArgs = ['-y', '-threads', th, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${w}x${h}`, '-r', '30', '-i', '-', '-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le', '-vendor', 'apl0', '-bits_per_mb', '8000', '-threads', th, '-vf', 'scale=out_color_matrix=bt709:out_range=tv', '-f', 'null', '-'];
+  if (req.query.simple) encArgs.splice(encArgs.indexOf('-vf'), 2);
+  const enc = spawn(FFMPEG, encArgs, { stdio: ['pipe', 'ignore', 'pipe'] });
+  let log = ''; enc.stderr.on('data', d => { log += d; if (log.length > 4000) log = log.slice(-4000); });
+  gen.stdout.pipe(enc.stdin); enc.stdin.on('error', () => {});
+  const t0 = Date.now();
+  enc.on('close', (code, signal) => res.json({ code, signal, ms: Date.now() - t0, before, after: memInfo(), args: encArgs.join(' '), log: log.slice(-1200) }));
+});
 app.get('/api/debug', (req, res) => res.json({ ...memInfo(), mounts: (readNum('/proc/mounts') || '').split('\n').filter(l => /tmpfs| \/ | \/app| \/data/.test(l)), cpus: (readNum('/sys/fs/cgroup/cpu.max')), ffmpeg: FFMPEG }));
 
 /* ---------- fonts: drop any .ttf/.otf/.woff2 into public/fonts ----------
