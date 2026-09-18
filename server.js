@@ -5,19 +5,58 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import ffmpegStatic from 'ffmpeg-static';
+import crypto from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 5173;
+// HOSTED=1 → running on a server (Railway/Docker): downloads instead of Finder, password, no file watcher
+const HOSTED = !!process.env.HOSTED;
 const PUBLIC = path.join(__dirname, 'public');
 const FONTS = path.join(PUBLIC, 'fonts');
 const EFFECTS = path.join(PUBLIC, 'effects');
-const EXPORTS = path.join(__dirname, 'exports');
+// EXPORTS_DIR / LOGOS_DIR let a hosted deployment keep these on a persistent volume
+const EXPORTS = process.env.EXPORTS_DIR || path.join(__dirname, 'exports');
+const LOGOS_DEFAULT = path.join(PUBLIC, 'assets', 'logos');
+const LOGOS = process.env.LOGOS_DIR || LOGOS_DEFAULT;
 // ffmpeg-static downloads a binary at install time; if that failed, fall back to a system ffmpeg (brew install ffmpeg)
 const FFMPEG = process.env.FFMPEG || (ffmpegStatic && fs.existsSync(ffmpegStatic) ? ffmpegStatic : 'ffmpeg');
 fs.mkdirSync(EXPORTS, { recursive: true });
+fs.mkdirSync(LOGOS, { recursive: true });
+// first start on a fresh volume: seed the logo folder with the ones shipped in the repo
+if (LOGOS !== LOGOS_DEFAULT && fs.existsSync(LOGOS_DEFAULT) && fs.readdirSync(LOGOS).length === 0) {
+  for (const f of fs.readdirSync(LOGOS_DEFAULT)) if (f.toLowerCase().endsWith('.png')) fs.copyFileSync(path.join(LOGOS_DEFAULT, f), path.join(LOGOS, f));
+}
 
 const app = express();
 app.use(express.json({ limit: '40mb' }));
+
+/* ---------- optional password (APP_PASSWORD env) ----------
+ * Team-internal protection for a hosted deployment. Requests from the machine itself (the render Chromium
+ * loading stage.html) always pass. Cookie = sha256(password), so changing the password logs everyone out. */
+const APP_PASSWORD = process.env.APP_PASSWORD || '';
+const authToken = APP_PASSWORD ? crypto.createHash('sha256').update(APP_PASSWORD).digest('hex') : '';
+const isLoopback = req => /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress || '');
+const LOGIN_HTML = `<!doctype html><meta charset="utf-8"><title>Text Motion</title><meta name="viewport" content="width=device-width">
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111;color:#eee;font:15px system-ui,sans-serif}form{display:grid;gap:12px;width:280px}h1{font-size:18px;font-weight:600;margin:0 0 4px}input{padding:10px 12px;border:1px solid #333;border-radius:8px;background:#1a1a1a;color:#eee;font-size:15px}button{padding:10px;border:0;border-radius:8px;background:#eee;color:#111;font-weight:600;font-size:15px;cursor:pointer}p{margin:0;color:#f66;font-size:13px;min-height:1em}</style>
+<form method="post" action="/api/login"><h1>Text Motion</h1><input type="password" name="password" placeholder="Password" autofocus autocomplete="current-password"><button>Enter</button><p>__MSG__</p></form>`;
+app.use(express.urlencoded({ extended: false }));
+app.post('/api/login', (req, res) => {
+  if (!APP_PASSWORD) return res.redirect('/');
+  if (String(req.body && req.body.password) === APP_PASSWORD) {
+    res.setHeader('Set-Cookie', `tm_auth=${authToken}; Path=/; Max-Age=${60 * 60 * 24 * 90}; HttpOnly; SameSite=Lax`);
+    return res.redirect('/');
+  }
+  res.status(401).type('html').send(LOGIN_HTML.replace('__MSG__', 'Wrong password'));
+});
+if (APP_PASSWORD) app.use((req, res, next) => {
+  if (isLoopback(req)) return next();
+  const ok = (req.headers.cookie || '').split(/;\s*/).some(c => c === `tm_auth=${authToken}`);
+  if (ok) return next();
+  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'unauthorized' });
+  res.status(401).type('html').send(LOGIN_HTML.replace('__MSG__', ''));
+});
+
+app.get('/api/env', (req, res) => res.json({ hosted: HOSTED }));
 
 /* ---------- fonts: drop any .ttf/.otf/.woff2 into public/fonts ----------
  * Family name = file name up to the first "-" or "[" (Archivo[wdth,wght].ttf → Archivo,
@@ -55,9 +94,8 @@ app.get('/api/effects.js', (req, res) => {
   res.type('application/javascript').send(files.map(f => `/* ${f} */\n{\n${fs.readFileSync(path.join(EFFECTS, f), 'utf8')}\n}`).join('\n\n'));
 });
 
-/* ---------- logos (for the Logo roll effect): public/assets/logos/*.png ---------- */
-const LOGOS = path.join(PUBLIC, 'assets', 'logos');
-fs.mkdirSync(LOGOS, { recursive: true });
+/* ---------- logos (for the Logo roll effect): public/assets/logos/*.png (or LOGOS_DIR) ---------- */
+if (LOGOS !== LOGOS_DEFAULT) app.use('/assets/logos', express.static(LOGOS));
 function pngSize(file) {
   try { const b = Buffer.alloc(24); const fd = fs.openSync(file, 'r'); fs.readSync(fd, b, 0, 24, 0); fs.closeSync(fd);
     return b.toString('ascii', 12, 16) === 'IHDR' ? { w: b.readUInt32BE(16), h: b.readUInt32BE(20) } : {}; } catch { return {}; }
@@ -85,9 +123,28 @@ app.delete('/api/logos/:name', (req, res) => {
 const jobs = new Map();
 let browser;
 async function getBrowser() {
-  if (!browser || !browser.isConnected()) browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
+  if (!browser || !browser.isConnected()) browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM || undefined,
+    // containers usually run as root with a small /dev/shm; both flags are needed there and harmless locally
+    args: HOSTED ? ['--no-sandbox', '--disable-dev-shm-usage'] : [],
+  });
   return browser;
 }
+// exports run one at a time — two 4K renders in parallel on one Chromium just slow each other down
+let queue = Promise.resolve();
+const enqueue = fn => { const p = queue.then(fn, fn); queue = p.catch(() => {}); return p; };
+// hosted: exports are downloaded right away, so anything older than EXPORT_TTL_HOURS (default 24) is deleted
+const EXPORT_TTL = (+process.env.EXPORT_TTL_HOURS || 24) * 3600 * 1000;
+function cleanExports() {
+  if (!HOSTED) return;
+  const now = Date.now();
+  for (const f of fs.readdirSync(EXPORTS)) {
+    if (f.startsWith('.')) continue;
+    const p = path.join(EXPORTS, f);
+    try { if (now - fs.statSync(p).mtimeMs > EXPORT_TTL) fs.rmSync(p, { recursive: true, force: true }); } catch {}
+  }
+}
+cleanExports(); setInterval(cleanExports, 3600 * 1000).unref();
 
 function slug(s) { return s.replace(/\s+/g, '-').replace(/[^\w\-가-힣]/g, '').slice(0, 40) || 'text'; }
 
@@ -97,14 +154,19 @@ app.post('/api/export', async (req, res) => {
   const job = { id, status: 'starting', frame: 0, frames: 0, file: null, error: null };
   jobs.set(id, job);
   res.json({ id });
-  runExport(job, config, format, name).catch(err => { job.status = 'error'; job.error = String(err && err.stack || err); console.error(err); });
+  job.status = 'queued';
+  enqueue(() => runExport(job, config, format, name)).catch(err => { job.status = 'error'; job.error = String(err && err.stack || err); console.error(err); });
 });
 app.get('/api/export/:id', (req, res) => res.json(jobs.get(req.params.id) || { status: 'unknown' }));
 app.get('/api/exports', (req, res) => {
   const files = fs.readdirSync(EXPORTS).filter(f => !f.startsWith('.')).map(f => ({ name: f, size: fs.statSync(path.join(EXPORTS, f)).size, mtime: fs.statSync(path.join(EXPORTS, f)).mtimeMs })).sort((a, b) => b.mtime - a.mtime);
   res.json(files);
 });
-app.use('/exports', express.static(EXPORTS));
+// ?download=1 → browser saves the file instead of opening it (used by the Download button when hosted)
+app.use('/exports', (req, res, next) => {
+  if (req.query.download) res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(path.basename(req.path))}"`);
+  next();
+}, express.static(EXPORTS));
 // reveal a file (or the exports folder) in Finder / Explorer
 app.post('/api/reveal', (req, res) => {
   const f = req.body && req.body.file ? path.join(EXPORTS, path.basename(String(req.body.file))) : EXPORTS;
@@ -116,6 +178,7 @@ app.post('/api/reveal', (req, res) => {
 async function runExport(job, config, format, name) {
   const { width, height, fps } = config;
   const base = `${slug(name || config.text.split('\n')[0])}_${config.effect}_${width}x${height}_${fps}fps_${job.id}`;
+  job.status = 'starting';
   const b = await getBrowser();
   const page = await b.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   const c = Buffer.from(unescape(encodeURIComponent(JSON.stringify(config)))).toString('base64');
@@ -163,15 +226,25 @@ async function runExport(job, config, format, name) {
     const code = await new Promise(r => ff.on('close', r));
     if (code !== 0) throw new Error('ffmpeg exited ' + code + '\n' + ff.__log());
   }
+  // hosted: a folder can't be downloaded, so zip the PNG sequence (needs the `zip` binary — see Dockerfile)
+  if (pngDir && HOSTED) {
+    job.status = 'encoding';
+    const zipFile = pngDir + '.zip';
+    const z = spawn('zip', ['-q', '-r', '-j', zipFile, pngDir], { stdio: 'ignore' });
+    const code = await new Promise(r => z.on('close', r));
+    if (code !== 0) throw new Error('zip exited ' + code);
+    fs.rmSync(pngDir, { recursive: true, force: true });
+    job.status = 'done'; job.file = path.basename(zipFile); return;
+  }
   job.status = 'done';
   job.file = pngDir ? path.basename(pngDir) + '/' : path.basename(outFile);
 }
 
 app.use(express.static(PUBLIC));
 // auto-restart when server.js is updated (start.command relaunches on exit code 75)
-if (!process.env.NO_WATCH) { let t; fs.watch(fileURLToPath(import.meta.url), () => { clearTimeout(t); t = setTimeout(() => { console.log('server.js changed — restarting'); process.exit(75); }, 300); }); }
+if (!process.env.NO_WATCH && !HOSTED) { let t; fs.watch(fileURLToPath(import.meta.url), () => { clearTimeout(t); t = setTimeout(() => { console.log('server.js changed — restarting'); process.exit(75); }, 300); }); }
 
 app.listen(PORT, () => {
-  console.log(`\n  text-motion  →  http://localhost:${PORT}\n  ffmpeg: ${FFMPEG}\n  exports: ${EXPORTS}\n`);
+  console.log(`\n  text-motion  →  http://localhost:${PORT}${HOSTED ? '  (hosted mode)' : ''}\n  ffmpeg: ${FFMPEG}\n  exports: ${EXPORTS}\n  logos: ${LOGOS}${APP_PASSWORD ? '\n  password: on' : ''}\n`);
 });
 process.on('exit', () => browser && browser.close());

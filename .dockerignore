@@ -1,0 +1,7 @@
+node_modules
+exports
+_to_delete
+.git
+.DS_Store
+*.zip
+HANDOFF.md

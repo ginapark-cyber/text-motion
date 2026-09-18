@@ -197,7 +197,7 @@ manipulation</textarea></div>
   <button class="primary" id="export">Export .mov</button>
   <div id="progress"><i></i></div>
   <div id="status"></div>
-  <p class="hint">Transparent background · saved to the <a href="#" id="openExports" style="color:var(--text)">exports folder</a></p>
+  <p class="hint" id="exportHint">Transparent background · saved to the <a href="#" id="openExports" style="color:var(--text)">exports folder</a></p>
 
   <div id="paramsBox" hidden><h2 id="paramsTitle">Effect settings</h2><div id="params"></div></div>
 
@@ -524,6 +524,12 @@ async function refreshExports(){ return; /* list removed — the result line + S
   $('exports').innerHTML = list.slice(0, 5).map(f => `<li><a href="/exports/${encodeURIComponent(f.name)}" target="_blank" title="${f.name}">${f.name}</a><span>${f.size ? (f.size/1048576).toFixed(1) + ' MB' : ''}</span></li>`).join('') || '<li><span>Nothing yet</span></li>';
 }
 refreshExports();
+// hosted (Railway/Docker) vs local Mac: hosted downloads the file, local reveals it in Finder
+let HOSTED = false;
+fetch('/api/env').then(r => r.json()).then(e => {
+  HOSTED = !!e.hosted;
+  if (HOSTED) $('exportHint').textContent = 'Transparent background · the file downloads to your computer when the render finishes';
+}).catch(() => {});
 $('openExports').onclick = e => { e.preventDefault(); fetch('/api/reveal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); };
 $('export').onclick = async () => {
   const btn = $('export'); btn.disabled = true;
@@ -534,13 +540,23 @@ $('export').onclick = async () => {
   const { id } = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config: readConfig(), format, name: $('name').value.trim() || (isGraphic() ? $('effect').selectedOptions[0].textContent : '') }) }).then(r => r.json());
   const tick = async () => {
     const j = await fetch('/api/export/' + id).then(r => r.json());
-    if (j.status === 'rendering') { bar.style.width = (j.frame / j.frames * 100) + '%'; $('status').textContent = `Rendering frame ${j.frame} / ${j.frames}`; }
+    if (j.status === 'queued') { $('status').textContent = 'Waiting for another export to finish…'; }
+    else if (j.status === 'rendering') { bar.style.width = (j.frame / j.frames * 100) + '%'; $('status').textContent = `Rendering frame ${j.frame} / ${j.frames}`; }
     else if (j.status === 'encoding') { bar.style.width = '100%'; $('status').textContent = 'Encoding…'; }
     if (j.status === 'done') {
       $('status').innerHTML = ''; const nm = document.createElement('span'); nm.textContent = `Done · ${j.file}`; nm.style.cssText = 'display:block;color:var(--text);margin-bottom:6px;word-break:break-all';
-      const rv = document.createElement('button'); rv.textContent = 'Show in Finder'; rv.style.cssText = 'font-size:12px;padding:5px 10px';
-      rv.onclick = () => fetch('/api/reveal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: j.file }) });
-      $('status').append(nm, rv); btn.disabled = false; return; }
+      if (HOSTED) {
+        const url = '/exports/' + encodeURIComponent(j.file) + '?download=1';
+        const dl = document.createElement('a'); dl.textContent = 'Download'; dl.href = url; dl.setAttribute('download', j.file);
+        dl.style.cssText = 'display:inline-block;font-size:12px;padding:5px 10px;border-radius:6px;background:var(--text);color:var(--bg,#111);text-decoration:none;font-weight:600';
+        $('status').append(nm, dl);
+        const auto = document.createElement('a'); auto.href = url; auto.setAttribute('download', j.file); auto.style.display = 'none'; document.body.append(auto); auto.click(); auto.remove();   // start the download right away
+      } else {
+        const rv = document.createElement('button'); rv.textContent = 'Show in Finder'; rv.style.cssText = 'font-size:12px;padding:5px 10px';
+        rv.onclick = () => fetch('/api/reveal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: j.file }) });
+        $('status').append(nm, rv);
+      }
+      btn.disabled = false; return; }
     if (j.status === 'error') { $('status').textContent = 'Error: ' + j.error; btn.disabled = false; return; }
     setTimeout(tick, 300);
   };
