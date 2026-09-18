@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import ffmpegStatic from 'ffmpeg-static';
 import crypto from 'node:crypto';
-import os from 'node:os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 5173;
@@ -223,7 +222,13 @@ async function runExport(job, config, format, name) {
   const twoPhase = HOSTED && format !== 'png';
   let ff = null, pngDir = null, tmpDir = null;
   if (format === 'png') { pngDir = path.join(EXPORTS, base); fs.mkdirSync(pngDir, { recursive: true }); }
-  else if (twoPhase) { tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-')); pngDir = tmpDir; }
+  else if (twoPhase) {
+    // NOT os.tmpdir(): in containers /tmp is usually tmpfs (RAM), and 85 frames of 4K PNG is ~1 GB. Use real disk.
+    const scratch = process.env.SCRATCH_DIR || path.join(__dirname, '.scratch');
+    fs.mkdirSync(scratch, { recursive: true });
+    for (const d of fs.readdirSync(scratch)) fs.rmSync(path.join(scratch, d), { recursive: true, force: true });   // leftovers from a crashed run
+    tmpDir = fs.mkdtempSync(path.join(scratch, 'tm-')); pngDir = tmpDir;
+  }
   else ff = spawnFf(encodeArgs(['-f', 'image2pipe', '-framerate', String(fps), '-i', '-']), true);
 
   for (let i = 0; i < frames; i++) {
