@@ -36,9 +36,9 @@ app.use(express.json({ limit: '40mb' }));
 const APP_PASSWORD = process.env.APP_PASSWORD || '';
 const authToken = APP_PASSWORD ? crypto.createHash('sha256').update(APP_PASSWORD).digest('hex') : '';
 const isLoopback = req => /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress || '');
-const LOGIN_HTML = `<!doctype html><meta charset="utf-8"><title>Text Motion</title><meta name="viewport" content="width=device-width">
+const LOGIN_HTML = `<!doctype html><meta charset="utf-8"><title>Rollout Text Animation</title><meta name="viewport" content="width=device-width">
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111;color:#eee;font:15px system-ui,sans-serif}form{display:grid;gap:12px;width:280px}h1{font-size:18px;font-weight:600;margin:0 0 4px}input{padding:10px 12px;border:1px solid #333;border-radius:8px;background:#1a1a1a;color:#eee;font-size:15px}button{padding:10px;border:0;border-radius:8px;background:#eee;color:#111;font-weight:600;font-size:15px;cursor:pointer}p{margin:0;color:#f66;font-size:13px;min-height:1em}</style>
-<form method="post" action="/api/login"><h1>Text Motion</h1><input type="password" name="password" placeholder="Password" autofocus autocomplete="current-password"><button>Enter</button><p>__MSG__</p></form>`;
+<form method="post" action="/api/login"><h1>Rollout Text Animation</h1><input type="password" name="password" placeholder="Password" autofocus autocomplete="current-password"><button>Enter</button><p>__MSG__</p></form>`;
 app.use(express.urlencoded({ extended: false }));
 app.post('/api/login', (req, res) => {
   if (!APP_PASSWORD) return res.redirect('/');
