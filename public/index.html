@@ -132,7 +132,7 @@ manipulation</textarea></div>
   <div class="row"><label class="f">Family<select id="font"></select></label><label class="f">Style<select id="weight"></select></label></div>
   <div class="row one"><p class="hint" style="margin:2px 0 0"><a href="#" id="addFont" style="color:var(--text)">Add a font</a> <span id="fontMsg"></span><input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2" multiple hidden></p></div>
   <div class="row"><label class="f"><span class="lv">Size <b class="sv" data-for="size" data-unit=" px"></b></span><input type="range" id="size" min="60" max="900" step="10" value="260"></label><label class="f">Color<input type="color" id="color" value="#ffffff"></label></div>
-  <div class="row"><label class="f"><span class="lv">Tracking <b class="sv" data-for="tracking" data-unit=" em"></b></span><input type="range" id="tracking" min="-0.1" max="0.2" step="0.001" value="-0.016"></label><label class="f"><span class="lv">Line height <b class="sv" data-for="leading" data-unit=""></b></span><input type="range" id="leading" min="0.5" max="2" step="0.01" value="0.62"></label></div>
+  <div class="row"><label class="f"><span class="lv">Tracking <b class="sv" data-for="tracking" data-unit=" em"></b></span><input type="range" id="tracking" min="-0.1" max="0.2" step="0.001" value="-0.016"></label><label class="f"><span class="lv" title="Only affects text with two or more lines">Line height <b class="sv" data-for="leading" data-unit=""></b></span><input type="range" id="leading" min="0.5" max="2" step="0.01" value="0.62"></label></div>
 
   <h2>Position</h2>
   <div class="row one"><span class="seg" id="alignPill"><button data-v="left" class="on">Left</button><button data-v="center">Center</button><button data-v="right">Right</button></span><input type="hidden" id="align" value="left"></div>
@@ -299,9 +299,14 @@ function updateParamsBox(){
 function send(msg){ stage.contentWindow.postMessage({ tm: true, ...msg }, '*'); }
 let loadTimer, loopTimer;
 function reload(autoplay = true){
-  if (!stageReady) return;
   clearTimeout(loadTimer);
-  loadTimer = setTimeout(() => { send({ cmd: 'load', config: readConfig(), autoplay }); fit(); save(); }, 60);
+  loadTimer = setTimeout(() => {
+    save();
+    // on the gallery screen the panel edits every card, not the (hidden) editor stage
+    if (!$('gallery').hidden) { cards.forEach(c => c.iframe.contentWindow && c.iframe.contentWindow.postMessage({ tm: true, cmd: 'load', config: galleryConfig(c.id), autoplay: true }, '*')); return; }
+    if (!stageReady) return;
+    send({ cmd: 'load', config: readConfig(), autoplay }); fit();
+  }, 60);
 }
 function fit(){
   const vp = $('viewport'), w = +$('w').value, h = +$('h').value;
@@ -334,8 +339,9 @@ addEventListener('message', e => {
 const cards = new Map();   // contentWindow -> { id, iframe, loopTimer }
 function galleryConfig(id){
   const g = effects.find(e => e.id === id), graphic = g && g.kind === 'graphic';
-  return { effect: id, text: $('text').value || 'Sample text', width: 1920, height: 1080, fps: 30, speed: 1, bg: 'transparent',
-    style: { font: $('font').value || 'Archivo', weight: +$('weight').value || 400, size: 260, tracking: -0.016, leading: 0.62, color: graphic ? $('gcolor').value : $('color').value, anchor: 'center-center', x: 120, y: 120, align: 'center' },
+  const c = readConfig();   // cards follow the panel (size, tracking, line height, position…) so the preview matches the export
+  return { ...c, effect: id, text: $('text').value || 'Sample text', width: 1920, height: 1080, fps: 30, speed: 1, bg: 'transparent',
+    style: { ...c.style, color: graphic ? $('gcolor').value : $('color').value },
     timing: { preHold: 400, endHold: 1400, exit: 'none' }, params: g && g.params.some(p => p.key === 'tint') ? { tint: 'white' } : {} };   // logos read better in white on the dark card
 }
 function buildGallery(){
@@ -483,7 +489,17 @@ $('format').onchange = () => { setExportLabel(); save(); };
 function showVals(){ document.querySelectorAll('.sv').forEach(b => { const el = $(b.dataset.for); if (!el) return; const st = +el.step || 1; const dec = st < 0.01 ? 3 : st < 0.1 ? 2 : st < 1 ? 1 : 0; b.textContent = (+el.value).toFixed(dec) + (b.dataset.unit || ''); }); }
 document.querySelectorAll('.sv').forEach(b => { const el = $(b.dataset.for); if (el) el.addEventListener('input', showVals); });
 showVals();
-function setVpos(v, doReload = true){ $('vpos').value = v; document.querySelectorAll('#vposSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); if (doReload) reload(); }
+function setVpos(v, doReload = true){ $('vpos').value = v; document.querySelectorAll('#vposSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); updateMarginState(); if (doReload) reload(); }
+// a margin only does something on the side the text is anchored to: centred text ignores it
+function updateMarginState(){
+  const pairs = [['x', $('align').value === 'center', 'Horizontal margin only applies to Left or Right alignment'],
+                 ['y', $('vpos').value === 'center', 'Vertical margin only applies to Top or Bottom position']];
+  for (const [id, off, why] of pairs) {
+    const el = $(id); if (!el) continue;
+    el.disabled = off;
+    const lab = el.closest('label'); if (lab) { lab.style.opacity = off ? .4 : 1; lab.title = off ? why : ''; }
+  }
+}
 document.querySelectorAll('#vposSeg button').forEach(b => b.onclick = () => setVpos(b.dataset.v));
 
 function showSpeed(){ $('speedV').textContent = (+$('speed').value).toFixed(2) + '×'; }
@@ -493,7 +509,7 @@ $('speed').addEventListener('dblclick', () => { $('speed').value = 1; showSpeed(
 $('play').onclick = () => { if (playing) { send({ cmd: 'pause' }); playing = false; $('play').textContent = '▶'; } else { send({ cmd: 'play', from: curT >= total ? 0 : curT }); playing = true; $('play').textContent = '❚❚'; } };
 $('restart').onclick = () => { send({ cmd: 'play', from: 0 }); playing = true; $('play').textContent = '❚❚'; };
 $('scrub').oninput = e => { send({ cmd: 'seek', t: e.target.value / 1000 * total }); playing = false; $('play').textContent = '▶'; };
-function setAlign(v, doReload = true){ $('align').value = v; document.querySelectorAll('#alignPill button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); if (doReload) reload(); }
+function setAlign(v, doReload = true){ $('align').value = v; document.querySelectorAll('#alignPill button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); updateMarginState(); if (doReload) reload(); }
 document.querySelectorAll('#alignPill button').forEach(b => b.onclick = () => setAlign(b.dataset.v));
 document.querySelectorAll('#bgPill button').forEach(b => b.onclick = () => { document.querySelectorAll('#bgPill button').forEach(x => x.classList.remove('on')); b.classList.add('on'); frame.className = b.dataset.bg; });
 addEventListener('keydown', e => { if (e.code === 'Space' && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.preventDefault(); $('play').click(); } });
@@ -518,6 +534,7 @@ fetch('/api/fonts').then(r => r.json()).then(list => {
   reload($('gallery').hidden);
 });
 $('font').addEventListener('change', () => { fillStyles(400); reload(); });
+updateMarginState();
 
 /* ---------- add a font (file goes to the server's fonts folder, so the whole team gets it) ---------- */
 async function refreshFonts(selectFamily){
