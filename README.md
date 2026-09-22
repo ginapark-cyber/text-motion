@@ -2,7 +2,7 @@
 
 > **For developers taking this over** — start here.
 >
-> - **Source:** https://github.com/ginapark-cyber/text-motion
+> - **Source:** https://github.com/parkksoyoung/text-motion
 > - **Hosting / moving to another server:** see [`DEPLOY.md`](DEPLOY.md). Ships with a `Dockerfile` (Node 22 + Playwright Chromium + ffmpeg). Any Docker host works; needs ~2 GB RAM for 4K renders, a writable volume for `/data`, and nothing else (no DB, no auth).
 > - **What it is:** ~1,800 lines of vanilla HTML/JS + one Express server. The browser previews an effect; the server re-renders the same page frame-by-frame in headless Chromium and pipes the PNGs into ffmpeg to produce a ProRes 4444 `.mov` with alpha.
 > - **Where things live:** `server.js` (serving + `/api/export` render), `public/engine.js` (timeline), `public/effects/*.js` (one file per effect), `public/index.html` (UI), `public/stage.html` (render page).
