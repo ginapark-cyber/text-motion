@@ -12,7 +12,8 @@ const PORT = process.env.PORT || 5173;
 // HOSTED=1 → running on a server (Railway/Docker): downloads instead of Finder, password, no file watcher
 const HOSTED = !!process.env.HOSTED;
 const PUBLIC = path.join(__dirname, 'public');
-const FONTS = path.join(PUBLIC, 'fonts');
+const FONTS_DEFAULT = path.join(PUBLIC, 'fonts');
+const FONTS = process.env.FONTS_DIR || FONTS_DEFAULT;
 const EFFECTS = path.join(PUBLIC, 'effects');
 // EXPORTS_DIR / LOGOS_DIR let a hosted deployment keep these on a persistent volume
 const EXPORTS = process.env.EXPORTS_DIR || path.join(__dirname, 'exports');
@@ -22,9 +23,13 @@ const LOGOS = process.env.LOGOS_DIR || LOGOS_DEFAULT;
 const FFMPEG = process.env.FFMPEG || (ffmpegStatic && fs.existsSync(ffmpegStatic) ? ffmpegStatic : 'ffmpeg');
 fs.mkdirSync(EXPORTS, { recursive: true });
 fs.mkdirSync(LOGOS, { recursive: true });
-// first start on a fresh volume: seed the logo folder with the ones shipped in the repo
+fs.mkdirSync(FONTS, { recursive: true });
+// first start on a fresh volume: seed the logo/font folders with the files shipped in the repo
 if (LOGOS !== LOGOS_DEFAULT && fs.existsSync(LOGOS_DEFAULT) && fs.readdirSync(LOGOS).length === 0) {
   for (const f of fs.readdirSync(LOGOS_DEFAULT)) if (f.toLowerCase().endsWith('.png')) fs.copyFileSync(path.join(LOGOS_DEFAULT, f), path.join(LOGOS, f));
+}
+if (FONTS !== FONTS_DEFAULT && fs.existsSync(FONTS_DEFAULT)) {
+  for (const f of fs.readdirSync(FONTS_DEFAULT)) if (/\.(ttf|otf|woff2?)$/i.test(f) && !fs.existsSync(path.join(FONTS, f))) fs.copyFileSync(path.join(FONTS_DEFAULT, f), path.join(FONTS, f));
 }
 
 const app = express();
@@ -81,7 +86,27 @@ function fontFiles() {
 }
 app.get('/api/fonts.css', (req, res) => {
   const css = fontFiles().map(f => `@font-face{font-family:"${f.family}";src:url("/fonts/${encodeURIComponent(f.file)}");font-weight:${f.weight};${f.variable ? 'font-stretch:50% 200%;' : ''}font-style:${f.italic ? 'italic' : 'normal'};font-display:block;}`).join('\n');
-  res.type('text/css').send(css);
+  res.set('Cache-Control', 'no-store').type('text/css').send(css);   // a newly uploaded font must show up on reload
+});
+// upload a font file: { name: 'Inter-Bold.ttf', data: base64 }. Family name comes from the file name
+// ("Inter-Bold.ttf" -> Inter Bold, "Inter[wght].ttf" -> Inter variable), same rule as the shipped fonts.
+const fontFileName = s => String(s || '').normalize('NFC').replace(/[^\w\-\[\]., ]/g, '').trim().replace(/\s+/g, '-').slice(0, 60);
+app.post('/api/fonts', (req, res) => {
+  const name = fontFileName(req.body.name);
+  const data = String(req.body.data || '').replace(/^data:[^;]*;base64,/, '');
+  if (!name || !data) return res.status(400).json({ error: 'name and data required' });
+  if (!/\.(ttf|otf|woff2?)$/i.test(name)) return res.status(400).json({ error: 'only .ttf, .otf, .woff or .woff2 files' });
+  const buf = Buffer.from(data, 'base64');
+  if (buf.length > 20 * 1024 * 1024) return res.status(400).json({ error: 'font file is larger than 20 MB' });
+  fs.writeFileSync(path.join(FONTS, name), buf);
+  res.json({ file: name, family: name.replace(/\.[^.]+$/, '').split(/[-\[]/)[0] });
+});
+app.delete('/api/fonts/:file', (req, res) => {
+  const name = fontFileName(req.params.file);
+  const file = path.join(FONTS, name);
+  if (path.dirname(file) !== FONTS) return res.status(400).json({ error: 'bad name' });
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+  res.json({ ok: true });
 });
 app.get('/api/fonts', (req, res) => {
   const fams = {};
@@ -90,6 +115,7 @@ app.get('/api/fonts', (req, res) => {
     if (f.variable) { fams[f.family].variable = true; [100,200,300,400,500,600,700,800,900].forEach(w => fams[f.family].weights.add(w)); }
     else fams[f.family].weights.add(+f.weight);
     if (f.italic) fams[f.family].italic = true;
+    (fams[f.family].files ??= []).push(f.file);
   });
   res.json(Object.values(fams).map(f => ({ ...f, weights: [...f.weights].sort((a, b) => a - b) })));
 });
@@ -102,6 +128,7 @@ app.get('/api/effects.js', (req, res) => {
 
 /* ---------- logos (for the Logo roll effect): public/assets/logos/*.png (or LOGOS_DIR) ---------- */
 if (LOGOS !== LOGOS_DEFAULT) app.use('/assets/logos', express.static(LOGOS));
+if (FONTS !== FONTS_DEFAULT) app.use('/fonts', express.static(FONTS));
 function pngSize(file) {
   try { const b = Buffer.alloc(24); const fd = fs.openSync(file, 'r'); fs.readSync(fd, b, 0, 24, 0); fs.closeSync(fd);
     return b.toString('ascii', 12, 16) === 'IHDR' ? { w: b.readUInt32BE(16), h: b.readUInt32BE(20) } : {}; } catch { return {}; }

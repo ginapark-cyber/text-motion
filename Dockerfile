@@ -22,8 +22,9 @@ COPY . .
 
 # persistent data (mount a volume here on Railway): rendered files + uploaded logos
 ENV EXPORTS_DIR=/data/exports \
-    LOGOS_DIR=/data/logos
-RUN mkdir -p /data/exports /data/logos
+    LOGOS_DIR=/data/logos \
+    FONTS_DIR=/data/fonts
+RUN mkdir -p /data/exports /data/logos /data/fonts
 
 EXPOSE 5173
 CMD ["node", "server.js"]

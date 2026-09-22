@@ -130,6 +130,7 @@ manipulation</textarea></div>
 
   <h2>Font</h2>
   <div class="row"><label class="f">Family<select id="font"></select></label><label class="f">Style<select id="weight"></select></label></div>
+  <div class="row one"><p class="hint" style="margin:2px 0 0"><a href="#" id="addFont" style="color:var(--text)">Add a font</a> <span id="fontMsg"></span><input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2" multiple hidden></p></div>
   <div class="row"><label class="f"><span class="lv">Size <b class="sv" data-for="size" data-unit=" px"></b></span><input type="range" id="size" min="60" max="900" step="10" value="260"></label><label class="f">Color<input type="color" id="color" value="#ffffff"></label></div>
 
   <h2>Position</h2>
@@ -517,6 +518,38 @@ fetch('/api/fonts').then(r => r.json()).then(list => {
   reload($('gallery').hidden);
 });
 $('font').addEventListener('change', () => { fillStyles(400); reload(); });
+
+/* ---------- add a font (file goes to the server's fonts folder, so the whole team gets it) ---------- */
+async function refreshFonts(selectFamily){
+  fontList = await fetch('/api/fonts').then(r => r.json());
+  const keep = $('font').value;
+  $('font').innerHTML = fontList.map(f => `<option value="${f.family}">${f.family}</option>`).join('');
+  $('font').value = fontList.find(f => f.family === (selectFamily ?? keep)) ? (selectFamily ?? keep) : (fontList[0] ? fontList[0].family : '');
+  fillStyles(selectFamily ? 400 : +$('weight').value);
+  // re-request the @font-face sheet so a just-uploaded file is available to the preview
+  const old = document.querySelector('link[href^="/api/fonts.css"]');
+  if (old) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/api/fonts.css?v=' + Date.now(); old.replaceWith(l); }
+  await document.fonts.ready.catch(() => {});
+  reload();
+}
+$('addFont').onclick = e => { e.preventDefault(); $('fontFile').click(); };
+$('fontFile').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  const msg = $('fontMsg'); msg.textContent = 'Uploading…'; let family = null;
+  for (const f of files) {
+    try {
+      const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(f); });
+      const r = await fetch('/api/fonts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, data }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || r.status);
+      family = j.family;
+    } catch (err) { msg.textContent = `${f.name}: ${err.message}`; return; }
+  }
+  await refreshFonts(family);
+  msg.textContent = files.length > 1 ? `Added ${files.length} files` : 'Added';
+  setTimeout(() => { msg.textContent = ''; }, 4000);
+};
 
 /* ---------- export ---------- */
 async function refreshExports(){ return; /* list removed — the result line + Show in Finder replaces it */
