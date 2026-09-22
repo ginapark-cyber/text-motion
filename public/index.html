@@ -132,6 +132,7 @@ manipulation</textarea></div>
   <div class="row"><label class="f">Family<select id="font"></select></label><label class="f">Style<select id="weight"></select></label></div>
   <div class="row one"><p class="hint" style="margin:2px 0 0"><a href="#" id="addFont" style="color:var(--text)">Add a font</a> <span id="fontMsg"></span><input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2" multiple hidden></p></div>
   <div class="row"><label class="f"><span class="lv">Size <b class="sv" data-for="size" data-unit=" px"></b></span><input type="range" id="size" min="60" max="900" step="10" value="260"></label><label class="f">Color<input type="color" id="color" value="#ffffff"></label></div>
+  <div class="row"><label class="f"><span class="lv">Tracking <b class="sv" data-for="tracking" data-unit=" em"></b></span><input type="range" id="tracking" min="-0.1" max="0.2" step="0.001" value="-0.016"></label><label class="f"><span class="lv">Line height <b class="sv" data-for="leading" data-unit=""></b></span><input type="range" id="leading" min="0.5" max="2" step="0.01" value="0.62"></label></div>
 
   <h2>Position</h2>
   <div class="row one"><span class="seg" id="alignPill"><button data-v="left" class="on">Left</button><button data-v="center">Center</button><button data-v="right">Right</button></span><input type="hidden" id="align" value="left"></div>
@@ -143,7 +144,6 @@ manipulation</textarea></div>
 
   <details class="adv"><summary>Typography</summary><div class="body">
     <div class="row"><label class="f"><span class="lv">Width <b class="sv" data-for="width" data-unit="%"></b></span><input type="range" id="width" min="62" max="125" step="1" value="100"></label><label class="f inline" style="align-self:end">Italic <input type="checkbox" id="italic"></label></div>
-    <div class="row"><label class="f"><span class="lv">Tracking <b class="sv" data-for="tracking" data-unit=" em"></b></span><input type="range" id="tracking" min="-0.1" max="0.2" step="0.001" value="-0.016"></label><label class="f"><span class="lv">Line height <b class="sv" data-for="leading" data-unit=""></b></span><input type="range" id="leading" min="0.5" max="1.6" step="0.01" value="0.62"></label></div>
   </div></details>
   </div>
 
