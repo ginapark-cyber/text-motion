@@ -64,10 +64,6 @@ if (APP_PASSWORD) app.use((req, res, next) => {
 // ALLOW_4K=0 hides the 4K / square presets and rejects >FHD exports (for small-RAM hosting plans). Unset = allowed.
 const ALLOW_4K = process.env.ALLOW_4K !== '0';
 app.get('/api/env', (req, res) => res.json({ hosted: HOSTED, allow4k: ALLOW_4K }));
-// container diagnostics (memory limit/usage, mounts) — handy when a render gets OOM-killed
-const readNum = f => { try { return fs.readFileSync(f, 'utf8').trim(); } catch { return null; } };
-const memInfo = () => ({ cgroupMax: readNum('/sys/fs/cgroup/memory.max') || readNum('/sys/fs/cgroup/memory/memory.limit_in_bytes'), cgroupCurrent: readNum('/sys/fs/cgroup/memory.current') || readNum('/sys/fs/cgroup/memory/memory.usage_in_bytes'), peak: readNum('/sys/fs/cgroup/memory.peak'), events: (readNum('/sys/fs/cgroup/memory.events') || '').replace(/\n/g, ' '), rss: process.memoryUsage().rss });
-app.get('/api/debug', (req, res) => res.json({ ...memInfo(), mounts: (readNum('/proc/mounts') || '').split('\n').filter(l => /tmpfs| \/ | \/app| \/data/.test(l)), cpus: (readNum('/sys/fs/cgroup/cpu.max')), ffmpeg: FFMPEG }));
 
 /* ---------- fonts: drop any .ttf/.otf/.woff2 into public/fonts ----------
  * Family name = file name up to the first "-" or "[" (Archivo[wdth,wght].ttf → Archivo,
@@ -289,11 +285,11 @@ async function runExport(job, config, format, name) {
     try { await b.close(); } catch {} browser = null;
     job.status = 'encoding';
     const frameBytes = fs.readdirSync(tmpDir).reduce((s, f) => s + fs.statSync(path.join(tmpDir, f)).size, 0);
-    console.log('[export] frames on disk:', (frameBytes / 1048576).toFixed(0), 'MB in', tmpDir, 'mem:', JSON.stringify(memInfo()));
+    console.log('[export] frames on disk:', (frameBytes / 1048576).toFixed(0), 'MB in', tmpDir);
     const enc = spawnFf(encodeArgs(['-f', 'image2', '-framerate', String(fps), '-i', path.join(tmpDir, 'f%05d.png')]), false);
     const code = await new Promise(r => enc.on('close', r));
     fs.rmSync(tmpDir, { recursive: true, force: true });
-    if (code !== 0) throw new Error('ffmpeg exited ' + code + (enc.__exited && enc.__exited.signal ? ' signal ' + enc.__exited.signal : '') + `\n[frames ${(frameBytes / 1048576).toFixed(0)} MB, mem ${JSON.stringify(memInfo())}]\n` + enc.__log().slice(-1500));
+    if (code !== 0) throw new Error('ffmpeg exited ' + code + (enc.__exited && enc.__exited.signal ? ' signal ' + enc.__exited.signal : '') + `\n[frames ${(frameBytes / 1048576).toFixed(0)} MB]\n` + enc.__log().slice(-1500));
     job.status = 'done'; job.file = path.basename(outFile); return;
   }
 

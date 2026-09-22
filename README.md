@@ -1,6 +1,16 @@
-# Text Motion
+# Rollout Text Animation (text-motion)
 
-텍스트 모션 프리셋을 브라우저에서 편집하고, 배경 없는 ProRes 4444 `.mov`(알파 포함)로 바로 뽑는 로컬 툴.
+> **For developers taking this over** — start here.
+>
+> - **Live (team is using it):** https://text-motion-production.up.railway.app (Railway trial, FHD only)
+> - **Source:** https://github.com/ginapark-cyber/text-motion (private; ask Soyoung for access)
+> - **Hosting / moving to another server:** see [`DEPLOY.md`](DEPLOY.md). Ships with a `Dockerfile` (Node 22 + Playwright Chromium + ffmpeg). Any Docker host works; needs ~2 GB RAM for 4K renders, a writable volume for `/data`, and nothing else (no DB, no auth).
+> - **What it is:** ~1,800 lines of vanilla HTML/JS + one Express server. The browser previews an effect; the server re-renders the same page frame-by-frame in headless Chromium and pipes the PNGs into ffmpeg to produce a ProRes 4444 `.mov` with alpha.
+> - **Where things live:** `server.js` (serving + `/api/export` render), `public/engine.js` (timeline), `public/effects/*.js` (one file per effect), `public/index.html` (UI), `public/stage.html` (render page).
+
+---
+
+텍스트 모션 프리셋을 브라우저에서 편집하고, 배경 없는 ProRes 4444 `.mov`(알파 포함)로 바로 뽑는 툴. 로컬(Mac)에서도, 서버(Docker)에서도 같은 코드로 돌아감.
 
 ## 실행
 

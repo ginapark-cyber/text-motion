@@ -33,7 +33,7 @@ The repo runs in two modes with the same code:
 - Railway project **zucchini-light** → service **text-motion**, URL: https://text-motion-production.up.railway.app
 - Trial plan (1 GB RAM): **FHD exports work, 4K gets OOM-killed** in ffmpeg. Upgrading to Hobby (8 GB) fixes 4K with no code change.
 - Volume mounted at `/data`. No `APP_PASSWORD` set (open link).
-- `/api/debug` shows cgroup memory limit/usage if a render dies with SIGKILL.
+
 
 ## Notes
 
