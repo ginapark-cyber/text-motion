@@ -23,7 +23,9 @@ html, body { margin:0; background:transparent; overflow:hidden; }
   await document.fonts.ready;
   const params = new URLSearchParams(location.search);
   if (params.has('c')) {
-    const config = JSON.parse(decodeURIComponent(escape(atob(params.get('c')))));
+    // base64 -> bytes -> utf8 (TextDecoder, so dashes, curly quotes and Hangul survive)
+    const bin = atob(params.get('c'));
+    const config = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, ch => ch.charCodeAt(0))));
     // make sure the fonts used are actually loaded before measuring
     const s = config.style || {};
     await document.fonts.load(`${s.italic ? 'italic ' : ''}${s.weight || 400} ${s.size || 300}px "${s.font || 'Archivo'}"`).catch(() => {});

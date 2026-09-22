@@ -215,7 +215,9 @@ async function runExport(job, config, format, name) {
   job.status = 'starting';
   const b = await getBrowser();
   const page = await b.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
-  const c = Buffer.from(unescape(encodeURIComponent(JSON.stringify(config)))).toString('base64');
+  // NOTE: must be plain utf8 -> base64. Buffer.from(unescape(encodeURIComponent(s))) double-encodes and turned
+  // "22–23" into "22â€“23" (and mangled Hangul) in the render, while the live preview looked fine.
+  const c = Buffer.from(JSON.stringify(config), 'utf8').toString('base64');
   await page.goto(`http://localhost:${PORT}/stage.html?c=${encodeURIComponent(c)}`);
   await page.waitForFunction(() => window.TM_ready === true, null, { timeout: 30000 });
   const total = await page.evaluate(() => window.TM_total);
