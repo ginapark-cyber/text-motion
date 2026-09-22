@@ -2,8 +2,7 @@
 
 > **For developers taking this over** — start here.
 >
-> - **Live (team is using it):** https://text-motion-production.up.railway.app (Railway trial, FHD only)
-> - **Source:** https://github.com/ginapark-cyber/text-motion (private; ask Soyoung for access)
+> - **Source:** https://github.com/ginapark-cyber/text-motion
 > - **Hosting / moving to another server:** see [`DEPLOY.md`](DEPLOY.md). Ships with a `Dockerfile` (Node 22 + Playwright Chromium + ffmpeg). Any Docker host works; needs ~2 GB RAM for 4K renders, a writable volume for `/data`, and nothing else (no DB, no auth).
 > - **What it is:** ~1,800 lines of vanilla HTML/JS + one Express server. The browser previews an effect; the server re-renders the same page frame-by-frame in headless Chromium and pipes the PNGs into ffmpeg to produce a ProRes 4444 `.mov` with alpha.
 > - **Where things live:** `server.js` (serving + `/api/export` render), `public/engine.js` (timeline), `public/effects/*.js` (one file per effect), `public/index.html` (UI), `public/stage.html` (render page).
@@ -56,7 +55,7 @@
 
 ### 로고 롤 로고 바꾸기
 
-왼쪽 **Logos** 패널에서 관리:
+저장소에는 로고가 들어있지 않음 (상표라서). 왼쪽 **Logos** 패널에서 직접 올려서 관리:
 - PNG/JPG/SVG 를 드래그해서 추가 → 흰색/검정 배경은 자동으로 지워지고 로고 영역만 잘라서 `public/assets/logos/` 에 저장
 - 체크 = 롤에 포함, ▲▼ = 순서, × = 파일 삭제
 - **Color**: Original / All white / All black / Color picker(왼쪽 Color 값)

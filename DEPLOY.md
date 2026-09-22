@@ -23,14 +23,14 @@ The repo runs in two modes with the same code:
 | `HOSTED` | unset | `1` → hosted mode (download button, password, no watcher, `--no-sandbox` Chromium) |
 | `APP_PASSWORD` | unset | if set, the site asks for this password once per browser (90-day cookie) |
 | `EXPORTS_DIR` | `./exports` | where renders are written (Dockerfile: `/data/exports`) |
-| `LOGOS_DIR` | `./public/assets/logos` | uploaded logos (Dockerfile: `/data/logos`; seeded from the repo folder on first start) |
+| `LOGOS_DIR` | `./public/assets/logos` | uploaded logos (Dockerfile: `/data/logos`). The repo ships no logos; upload them in the UI |
 | `EXPORT_TTL_HOURS` | 24 | hosted only: delete exports older than this |
 | `NO_WATCH` | unset | disable the server.js self-restart watcher (on in Docker) |
 | `FFMPEG` / `CHROMIUM` | auto | override binary paths |
 
 ## Current deployment (2026-09-18)
 
-- Railway project **zucchini-light** → service **text-motion**, URL: https://text-motion-production.up.railway.app
+- Railway project → service **text-motion** (URL shared internally, not in this repo).
 - Trial plan (1 GB RAM): **FHD exports work, 4K gets OOM-killed** in ffmpeg. Upgrading to Hobby (8 GB) fixes 4K with no code change.
 - Volume mounted at `/data`. No `APP_PASSWORD` set (open link).
 
