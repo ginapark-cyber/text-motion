@@ -122,6 +122,34 @@ app.get('/api/effects.js', (req, res) => {
   res.type('application/javascript').send(files.map(f => `/* ${f} */\n{\n${fs.readFileSync(path.join(EFFECTS, f), 'utf8')}\n}`).join('\n\n'));
 });
 
+/* ---------- presets: one JSON file, shared by everyone using this server ---------- */
+const PRESETS_FILE = process.env.PRESETS_FILE || path.join(path.dirname(LOGOS), 'presets.json');
+const readPresets = () => { try { return JSON.parse(fs.readFileSync(PRESETS_FILE, 'utf8')); } catch { return []; } };
+const writePresets = list => { fs.mkdirSync(path.dirname(PRESETS_FILE), { recursive: true }); fs.writeFileSync(PRESETS_FILE, JSON.stringify(list, null, 1)); };
+const presetName = s => String(s || '').normalize('NFC').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 60);
+app.get('/api/presets', (req, res) => res.json(readPresets().sort((a, b) => (b.updated || 0) - (a.updated || 0))));
+app.post('/api/presets', (req, res) => {
+  const name = presetName(req.body.name); const config = req.body.config;
+  if (!name || !config || typeof config !== 'object') return res.status(400).json({ error: 'name and config required' });
+  const list = readPresets(); const i = list.findIndex(p => p.name === name);
+  if (i >= 0 && !req.body.overwrite) return res.status(409).json({ error: 'a preset with this name already exists' });
+  const now = Date.now();
+  if (i >= 0) list[i] = { ...list[i], config, updated: now }; else list.push({ name, config, created: now, updated: now });
+  writePresets(list); res.json({ ok: true, name });
+});
+app.patch('/api/presets/:name', (req, res) => {
+  const from = presetName(req.params.name), to = presetName(req.body.name);
+  if (!from || !to) return res.status(400).json({ error: 'name required' });
+  const list = readPresets(); const p = list.find(x => x.name === from);
+  if (!p) return res.status(404).json({ error: 'not found' });
+  if (list.some(x => x.name === to && x !== p)) return res.status(409).json({ error: 'a preset with this name already exists' });
+  p.name = to; p.updated = Date.now(); writePresets(list); res.json({ ok: true });
+});
+app.delete('/api/presets/:name', (req, res) => {
+  const name = presetName(req.params.name); const list = readPresets();
+  writePresets(list.filter(p => p.name !== name)); res.json({ ok: true });
+});
+
 /* ---------- logos (for the Logo roll effect): public/assets/logos/*.png (or LOGOS_DIR) ---------- */
 if (LOGOS !== LOGOS_DEFAULT) app.use('/assets/logos', express.static(LOGOS));
 if (FONTS !== FONTS_DEFAULT) app.use('/fonts', express.static(FONTS));

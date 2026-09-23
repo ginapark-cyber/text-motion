@@ -25,6 +25,7 @@ The repo runs in two modes with the same code:
 | `EXPORTS_DIR` | `./exports` | where renders are written (Dockerfile: `/data/exports`) |
 | `LOGOS_DIR` | `./public/assets/logos` | uploaded logos (Dockerfile: `/data/logos`). The repo ships no logos; upload them in the UI |
 | `EXPORT_TTL_HOURS` | 24 | hosted only: delete exports older than this |
+| `PRESETS_FILE` | `<logos dir>/../presets.json` | team presets (Dockerfile: `/data/presets.json`, so they survive redeploys) |
 | `NO_WATCH` | unset | disable the server.js self-restart watcher (on in Docker) |
 | `FFMPEG` / `CHROMIUM` | auto | override binary paths |
 

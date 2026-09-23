@@ -17,6 +17,15 @@ header{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:0 18px;
 header h1{font-size:13px;font-weight:600;margin:0 8px 0 0;letter-spacing:.01em}
 header .sp{flex:1}
 #effect{min-width:240px}
+/* top-bar icon buttons */
+#tools{display:flex;align-items:center;gap:6px}
+#tools button{width:32px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;color:var(--text)}
+#tools button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#tools button:disabled{opacity:.3;cursor:default;background:var(--field)}
+#tools .sep{width:1px;height:20px;background:var(--line);margin:0 4px}
+#tools #export{width:auto;padding:0 12px;gap:7px;background:var(--text);color:#0f0f10;border-color:var(--text);font-weight:600}
+#tools #export:hover{background:#fff}
+#tools #export:disabled{opacity:.4}
 
 aside{background:var(--panel);overflow:auto;padding:18px}
 aside.left{border-right:1px solid var(--line)} aside.right{border-left:1px solid var(--line)}
@@ -59,10 +68,14 @@ button.primary:disabled{opacity:.4;cursor:default}
 .pill{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
 .pill button{border:0;border-radius:0;padding:5px 10px;font-size:11px;background:transparent}
 .pill button.on{background:var(--hi)}
-details{border-top:1px solid var(--line);margin-top:20px;padding-top:6px}
-details summary{cursor:pointer;color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;padding:10px 0;list-style:none;display:flex;justify-content:space-between}
-details summary::after{content:'+'} details[open] summary::after{content:'–'}
-details .body{padding:4px 0 6px}
+/* per-section disclosure for the detail controls ("More") */
+details.more{margin:2px 0 6px}
+details.more summary{cursor:pointer;color:var(--muted);font-size:11px;padding:4px 0;list-style:none;display:inline-flex;align-items:center;gap:5px;user-select:none}
+details.more summary::-webkit-details-marker{display:none}
+details.more summary::before{content:'';width:5px;height:5px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);margin-right:2px;transition:transform .15s}
+details.more[open] summary::before{transform:rotate(45deg)}
+details.more summary:hover{color:var(--text)}
+details.more .body{padding:8px 0 2px}
 .hint{color:var(--muted);font-size:11px;margin:8px 0 0;line-height:1.5}
 #progress{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin:12px 0 8px;display:none}
 #progress i{display:block;height:100%;background:var(--text);width:0;transition:width .2s}
@@ -82,11 +95,16 @@ details .body{padding:4px 0 6px}
 #logoDrop{border:1px dashed var(--line);border-radius:7px;padding:12px;text-align:center;font-size:12px;color:var(--muted);cursor:pointer}
 #logoDrop.over{border-color:var(--text);color:var(--text)}
 .prange{width:100%;margin:2px 0 0}
-body:not(.advanced) .adv{display:none!important}
-#advToggle{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;padding:5px 10px;border:1px solid var(--line);border-radius:7px}
-#advToggle input{margin:0}
-body.advanced #advToggle{color:var(--text);background:var(--hi)}
 #status:empty{display:none}
+/* presets */
+#presetList{list-style:none;margin:0;padding:0}
+#presetList li{display:flex;align-items:center;gap:8px;padding:7px 6px;margin:0 -6px;border-radius:6px;cursor:pointer;font-size:12px}
+#presetList li:hover{background:var(--hi)}
+#presetList .pn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#presetList .pd{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+#presetList button{width:22px;height:22px;padding:0;font-size:12px;line-height:1;border-radius:5px;opacity:0}
+#presetList li:hover button{opacity:1}
+#presetEmpty{color:var(--muted);font-size:11.5px;line-height:1.5}
 #gallery{position:fixed;left:0;right:0;top:52px;bottom:0;background:var(--bg);overflow:auto;padding:36px 40px;z-index:5}
 #gallery .intro{color:var(--muted);font-size:13px;margin:0 0 22px}
 #gallery .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px;max-width:1500px}
@@ -98,7 +116,7 @@ body.advanced #advToggle{color:var(--text);background:var(--hi)}
 .card .meta b{display:block;font-size:13px;font-weight:600;margin-bottom:3px}
 .card .meta span{font-size:11.5px;color:var(--muted);line-height:1.45}
 #backBtn{font-size:12px;padding:6px 10px}
-body.gallery #effect,body.gallery #backBtn,body.gallery #bgPill,body.gallery #advToggle{display:none}
+body.gallery #effect,body.gallery #backBtn,body.gallery #bgPill,body.gallery #export,body.gallery #reset{display:none}
 #paramsBox h2{margin-top:22px}
 .banner{background:#3a2a12;color:#f3d9a4;border:1px solid #6b4d1e;border-radius:7px;padding:9px 11px;font-size:12px;margin-bottom:14px;line-height:1.45}
 #logoDrop{margin-top:8px}
@@ -113,7 +131,14 @@ body.gallery #effect,body.gallery #backBtn,body.gallery #bgPill,body.gallery #ad
   <span class="pill" id="bgPill" title="Preview background only — exports are always transparent">
     <button data-bg="checker" class="on">Transparent</button><button data-bg="black">Black</button><button data-bg="white">White</button>
   </span>
-  <label id="advToggle" title="Show every setting (margins, typography, timing, frame rate, format, all effect parameters)"><input type="checkbox" id="advanced"> Advanced</label>
+  <span id="tools">
+    <button id="undo" title="Undo (⌘Z)" disabled><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+    <button id="redo" title="Redo (⇧⌘Z)" disabled><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
+    <button id="reset" title="Reset this effect's settings to defaults (text and font stay)"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
+    <span class="sep"></span>
+    <button id="savePreset" title="Save these settings as a preset for the team"><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg></button>
+    <button id="export" title="Render and download"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span id="exportLabel">Export .mov</span></button>
+  </span>
 </header>
 
 <section id="gallery" hidden>
@@ -132,18 +157,20 @@ manipulation</textarea></div>
   <div class="row"><label class="f">Family<select id="font"></select></label><label class="f">Style<select id="weight"></select></label></div>
   <div class="row one"><p class="hint" style="margin:2px 0 0"><a href="#" id="addFont" style="color:var(--text)">Add a font</a> <span id="fontMsg"></span><input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2" multiple hidden></p></div>
   <div class="row"><label class="f"><span class="lv">Size <b class="sv" data-for="size" data-unit=" px"></b></span><input type="range" id="size" min="60" max="900" step="10" value="260"></label><label class="f">Color<input type="color" id="color" value="#ffffff"></label></div>
-  <div class="row"><label class="f"><span class="lv">Tracking <b class="sv" data-for="tracking" data-unit=" em"></b></span><input type="range" id="tracking" min="-0.1" max="0.2" step="0.001" value="-0.016"></label><label class="f"><span class="lv" title="Only affects text with two or more lines">Line height <b class="sv" data-for="leading" data-unit=""></b></span><input type="range" id="leading" min="0.5" max="2" step="0.01" value="0.62"></label></div>
+  <details class="more" id="fontMore"><summary>More</summary><div class="body">
+    <div class="row"><label class="f"><span class="lv">Tracking <b class="sv" data-for="tracking" data-unit=" em"></b></span><input type="range" id="tracking" min="-0.1" max="0.2" step="0.001" value="-0.016"></label><label class="f"><span class="lv" title="Only affects text with two or more lines. When auto-wrap adds lines and this is still at the default, 0.95 is used.">Line height <b class="sv" data-for="leading" data-unit=""></b></span><input type="range" id="leading" min="0.5" max="2" step="0.01" value="0.62"></label></div>
+    <div class="row"><label class="f"><span class="lv">Width <b class="sv" data-for="width" data-unit="%"></b></span><input type="range" id="width" min="62" max="125" step="1" value="100"></label><label class="f inline" style="align-self:end">Italic <input type="checkbox" id="italic"></label></div>
+  </div></details>
 
   <h2>Position</h2>
   <div class="row one"><span class="seg" id="alignPill"><button data-v="left" class="on">Left</button><button data-v="center">Center</button><button data-v="right">Right</button></span><input type="hidden" id="align" value="left"></div>
   <div class="row one"><span class="seg" id="vposSeg"><button data-v="top" class="on">Top</button><button data-v="center">Middle</button><button data-v="bottom">Bottom</button></span><input type="hidden" id="vpos" value="top"></div>
-  <div class="row adv">
-    <label class="f"><span class="lv">Margin X <b class="sv" data-for="x" data-unit=" px"></b></span><input type="range" id="x" min="0" max="1200" step="10" value="120"></label>
-    <label class="f"><span class="lv">Margin Y <b class="sv" data-for="y" data-unit=" px"></b></span><input type="range" id="y" min="0" max="1200" step="10" value="120"></label>
-  </div>
-
-  <details class="adv"><summary>Typography</summary><div class="body">
-    <div class="row"><label class="f"><span class="lv">Width <b class="sv" data-for="width" data-unit="%"></b></span><input type="range" id="width" min="62" max="125" step="1" value="100"></label><label class="f inline" style="align-self:end">Italic <input type="checkbox" id="italic"></label></div>
+  <div class="row one"><label class="f"><span class="lv" title="Text wraps onto a new line when it gets wider than this. 100% = no auto-wrap. Line breaks you type are always kept.">Max width <b class="sv" data-for="maxWidth" data-unit="%"></b></span><input type="range" id="maxWidth" min="20" max="100" step="1" value="100"></label></div>
+  <details class="more" id="posMore"><summary>More</summary><div class="body">
+    <div class="row">
+      <label class="f"><span class="lv">Margin X <b class="sv" data-for="x" data-unit=" px"></b></span><input type="range" id="x" min="0" max="1200" step="10" value="120"></label>
+      <label class="f"><span class="lv">Margin Y <b class="sv" data-for="y" data-unit=" px"></b></span><input type="range" id="y" min="0" max="1200" step="10" value="120"></label>
+    </div>
   </div></details>
   </div>
 
@@ -160,9 +187,8 @@ manipulation</textarea></div>
   <h2>Exit</h2>
   <div class="row"><label class="f">Exit animation<select id="exit"><option value="none">None</option><option value="reverse">Reverse out</option></select></label>
     <label class="f" id="holdBox" hidden><span class="lv">Hold <b class="sv" data-for="hold" data-unit=" ms"></b></span><input type="range" id="hold" min="0" max="8000" step="100" value="1500"></label></div>
-  <div class="row adv" id="exitSpeedBox" hidden><label class="f"><span class="lv">Exit speed <b class="sv" data-for="exitSpeed" data-unit="×"></b></span><input type="range" id="exitSpeed" min="0.25" max="3" step="0.05" value="1"></label></div>
-
-  <details class="adv"><summary>Timing</summary><div class="body">
+  <details class="more" id="timingMore"><summary>More</summary><div class="body">
+    <div class="row" id="exitSpeedBox" hidden><label class="f"><span class="lv">Exit speed <b class="sv" data-for="exitSpeed" data-unit="×"></b></span><input type="range" id="exitSpeed" min="0.25" max="3" step="0.05" value="1"></label></div>
     <div class="row"><label class="f"><span class="lv">Start delay <b class="sv" data-for="preHold" data-unit=" ms"></b></span><input type="range" id="preHold" min="0" max="2000" step="10" value="80"></label><label class="f"><span class="lv">Hold at end <b class="sv" data-for="endHold" data-unit=" ms"></b></span><input type="range" id="endHold" min="0" max="5000" step="100" value="2000"></label></div>
   </div></details>
 </aside>
@@ -189,18 +215,25 @@ manipulation</textarea></div>
       <option value="3840x2160" selected>4K · 3840×2160</option><option value="1920x1080">FHD · 1920×1080</option><option value="1080x1920">Vertical FHD · 1080×1920</option><option value="2160x3840">Vertical 4K · 2160×3840</option><option value="2160x2160">Square · 2160×2160</option><option value="custom">Custom</option>
     </select></label></div>
   <div class="row" id="customSize" hidden><label class="f">Width<input type="number" id="w" value="3840" step="2"></label><label class="f">Height<input type="number" id="h" value="2160" step="2"></label></div>
-  <div class="row adv"><label class="f">Frame rate<select id="fps"><option>24</option><option>25</option><option selected>30</option><option>60</option></select></label><label class="f">Format<select id="format">
-      <option value="prores4444">ProRes 4444 (alpha)</option>
-      <option value="png">PNG sequence</option>
-      <option value="mp4">H.264 mp4 (black bg)</option>
-    </select></label></div>
   <div class="row one"><label class="f">File name<input type="text" id="name" placeholder="Defaults to the text"></label></div>
-  <button class="primary" id="export">Export .mov</button>
+  <details class="more" id="exportMore"><summary>More</summary><div class="body">
+    <div class="row"><label class="f">Frame rate<select id="fps"><option>24</option><option>25</option><option selected>30</option><option>60</option></select></label><label class="f">Format<select id="format">
+        <option value="prores4444">ProRes 4444 (alpha)</option>
+        <option value="png">PNG sequence</option>
+        <option value="mp4">H.264 mp4 (black bg)</option>
+      </select></label></div>
+  </div></details>
   <div id="progress"><i></i></div>
   <div id="status"></div>
   <p class="hint" id="exportHint">Transparent background · saved to the <a href="#" id="openExports" style="color:var(--text)">exports folder</a></p>
 
-  <div id="paramsBox" hidden><h2 id="paramsTitle">Effect settings</h2><div id="params"></div></div>
+  <div id="paramsBox" hidden><h2 id="paramsTitle">Effect settings</h2><div id="params"></div>
+    <details class="more" id="paramsMore" hidden><summary>More</summary><div class="body" id="paramsAdv"></div></details>
+  </div>
+
+  <h2>Presets</h2>
+  <ul id="presetList"></ul>
+  <p id="presetEmpty">Nothing saved yet. Set things up, then hit the save icon in the top bar.</p>
 
 </aside>
 
@@ -224,7 +257,7 @@ function readConfig(){
     bg: 'transparent',
     style: { font: $('font').value, weight: +$('weight').value, width: +$('width').value, italic: $('italic').checked,
              size: +$('size').value, tracking: +$('tracking').value, leading: +$('leading').value, color: (isGraphic() ? $('gcolor') : $('color')).value,
-             anchor: $('vpos').value + '-' + $('align').value, x: +$('x').value, y: +$('y').value, align: $('align').value },
+             anchor: $('vpos').value + '-' + $('align').value, x: +$('x').value, y: +$('y').value, align: $('align').value, maxWidth: +$('maxWidth').value },
     timing: { preHold: +$('preHold').value, endHold: +$('endHold').value, exit: $('exit').value, hold: +$('hold').value, exitSpeed: +$('exitSpeed').value },
     params,
   };
@@ -257,16 +290,17 @@ function buildParams(effectId, values = {}, savedDefaults = {}){
   // a saved value that still equals the default it was saved with was never touched by the user →
   // follow the current default instead (so updated effect defaults actually show up)
   values = { ...values }; Object.keys(values).forEach(k => { if (k in savedDefaults && values[k] === savedDefaults[k]) delete values[k]; });
-  const box = $('params'); box.innerHTML = '';
+  const basicBox = $('params'), advBox = $('paramsAdv'); basicBox.innerHTML = ''; advBox.innerHTML = '';
   def.params.forEach(p => {
+    const box = p.basic ? basicBox : advBox;   // basic params sit in the open panel, the rest under "More"
     if (p.hidden) { // still needs a value carrier (e.g. the logo list), but no visible control
       const inp = document.createElement('input'); inp.type = 'hidden'; inp.dataset.key = p.key;
-      const v = values[p.key]; inp.value = (p.type === 'text' && typeof v === 'string') ? v : String(p.default); box.appendChild(inp); return;
+      const v = values[p.key]; inp.value = (p.type === 'text' && typeof v === 'string') ? v : String(p.default); basicBox.appendChild(inp); return;
     }
     // saved values are only reused if they are still valid for this param (guards against stale settings)
     let v = values[p.key];
     if (v === undefined || (p.type === 'number' && (typeof v !== 'number' || v < p.min || v > p.max)) || (p.type === 'select' && !p.options.some(o => o.value === v)) || (p.type === 'text' && typeof v !== 'string')) v = p.default;
-    const lab = document.createElement('label'); lab.className = 'f' + (p.type === 'boolean' ? ' inline' : '') + (p.basic ? '' : ' adv');
+    const lab = document.createElement('label'); lab.className = 'f' + (p.type === 'boolean' ? ' inline' : '');
     lab.style.marginBottom = '10px';
     let inp;
     if (p.type === 'select') { inp = document.createElement('select'); p.options.forEach(o => { const op = document.createElement('option'); op.value = o.value; op.textContent = o.label; inp.appendChild(op); }); inp.value = v; }
@@ -289,9 +323,9 @@ function buildParams(effectId, values = {}, savedDefaults = {}){
   updateParamsBox();
 }
 function updateParamsBox(){
-  const adv = document.body.classList.contains('advanced');
-  const visible = [...$('params').querySelectorAll('label')].some(l => adv || !l.classList.contains('adv'));
-  $('paramsBox').hidden = !visible;
+  const nBasic = $('params').querySelectorAll('label').length, nAdv = $('paramsAdv').querySelectorAll('label').length;
+  $('paramsBox').hidden = !(nBasic || nAdv);
+  $('paramsMore').hidden = !nAdv;
   const def = effects.find(e => e.id === $('effect').value); $('paramsTitle').textContent = def ? def.name + ' settings' : 'Effect settings';
 }
 
@@ -301,11 +335,11 @@ let loadTimer, loopTimer;
 function reload(autoplay = true){
   clearTimeout(loadTimer);
   loadTimer = setTimeout(() => {
-    save();
+    save(); pushHistory();
     // on the gallery screen the panel edits every card, not the (hidden) editor stage
     if (!$('gallery').hidden) { cards.forEach(c => c.iframe.contentWindow && c.iframe.contentWindow.postMessage({ tm: true, cmd: 'load', config: galleryConfig(c.id), autoplay: true }, '*')); return; }
     if (!stageReady) return;
-    send({ cmd: 'load', config: readConfig(), autoplay }); fit();
+    send({ cmd: 'load', config: readConfig(), autoplay, guide: +$('maxWidth').value < 100 }); fit();
   }, 60);
 }
 function fit(){
@@ -326,11 +360,13 @@ addEventListener('message', e => {
     if (!effects.find(x => x.id === $('effect').value)) $('effect').value = effects[0].id;
     buildParams($('effect').value, s && s.effect === $('effect').value ? s.params : {}, s && s.effect === $('effect').value ? (s.pdefaults || {}) : {});
     refreshLogos();
-    applyMode(); showExit(); showVals();
+    applyMode(); showExit(); showVals(); updateMarginState();
     reload(false);
     showGallery();
+    // the first load normalises a few values; start undo history *after* that has settled
+    setTimeout(() => { hist.past = []; hist.future = []; hist.last = snap(); updateHistoryButtons(); }, 250);
   }
-  else if (m.evt === 'loaded') { total = m.total; playing = true; $('play').textContent = '❚❚'; }
+  else if (m.evt === 'loaded') { total = m.total; playing = true; $('play').textContent = '❚❚'; showWrapHint(!!m.wrapped); }
   else if (m.evt === 'time') { curT = m.t; if (!$('logoMgr').hidden) highlightLogo(m.t); $('scrub').value = Math.round(m.t / total * 1000) || 0; $('time').textContent = `${(m.t/1000).toFixed(2)} / ${(total/1000).toFixed(2)} s`; }
   else if (m.evt === 'ended') { playing = false; $('play').textContent = '▶'; if ($('loop').checked) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { if ($('loop').checked && !playing) $('restart').click(); }, 350); } }
 });
@@ -387,9 +423,86 @@ function applyMode(){
   $('name').placeholder = g ? 'Defaults to the effect name' : 'Defaults to the text';
   renderLogoList();
 }
-$('advanced').onchange = () => { document.body.classList.toggle('advanced', $('advanced').checked); updateParamsBox(); try { localStorage.setItem('text-motion:advanced', $('advanced').checked ? '1' : ''); } catch {} };
-try { if (localStorage.getItem('text-motion:advanced')) { $('advanced').checked = true; document.body.classList.add('advanced'); } } catch {}
 $('effect').onchange = () => { buildParams($('effect').value); applyMode(); reload(); };
+
+/* ---------- put a whole config back into the panel (undo/redo, presets) ---------- */
+let applying = false;
+function applyConfig(c){
+  applying = true;
+  try {
+    if (c.effect && effects.find(e => e.id === c.effect) && c.effect !== $('effect').value) { $('effect').value = c.effect; }
+    buildParams($('effect').value, c.params || {});
+    applyMode();
+    if (typeof c.text === 'string') $('text').value = c.text;
+    const st = c.style || {};
+    if (st.font && fontList.find(f => f.family === st.font)) { $('font').value = st.font; fillStyles(st.weight || 400); }
+    if (isGraphic()) { if (st.color) $('gcolor').value = st.color; } else if (st.color) $('color').value = st.color;
+    ['size','tracking','leading','width','x','y','maxWidth'].forEach(k => { if (st[k] !== undefined && $(k)) $(k).value = st[k]; });
+    if (st.italic !== undefined) $('italic').checked = !!st.italic;
+    if (st.align) setAlign(st.align, false);
+    if (st.anchor) setVpos(st.anchor.split('-')[0], false);
+    const tm = c.timing || {};
+    ['preHold','endHold','hold','exitSpeed'].forEach(k => { if (tm[k] !== undefined && $(k)) $(k).value = tm[k]; });
+    if (tm.exit) { $('exit').value = tm.exit; showExit(); }
+    if (c.speed) { $('speed').value = c.speed; showSpeed(); }
+    if (c.width && c.height) { $('w').value = c.width; $('h').value = c.height; const pv = `${c.width}x${c.height}`; $('preset').value = [...$('preset').options].some(o => o.value === pv) ? pv : 'custom'; $('customSize').hidden = $('preset').value !== 'custom'; }
+    showVals(); updateMarginState();
+  } finally { applying = false; }
+}
+
+/* ---------- undo / redo (snapshots of the whole config) ---------- */
+const hist = { past: [], future: [], last: null };
+function snap(){ return JSON.stringify(readConfig()); }
+function pushHistory(){
+  if (applying) return;
+  const s = snap(); if (s === hist.last) return;
+  if (hist.last !== null) { hist.past.push(hist.last); if (hist.past.length > 60) hist.past.shift(); }
+  hist.last = s; hist.future = [];
+  updateHistoryButtons();
+}
+function updateHistoryButtons(){ $('undo').disabled = !hist.past.length; $('redo').disabled = !hist.future.length; }
+function undo(){ if (!hist.past.length) return; hist.future.push(hist.last); hist.last = hist.past.pop(); applyConfig(JSON.parse(hist.last)); updateHistoryButtons(); reload(); }
+function redo(){ if (!hist.future.length) return; hist.past.push(hist.last); hist.last = hist.future.pop(); applyConfig(JSON.parse(hist.last)); updateHistoryButtons(); reload(); }
+$('undo').onclick = undo; $('redo').onclick = redo;
+addEventListener('keydown', e => {
+  if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
+  if (e.target.tagName === 'TEXTAREA' || (e.target.tagName === 'INPUT' && e.target.type === 'text')) return;   // let native text undo work inside fields
+  e.preventDefault(); e.shiftKey ? redo() : undo();
+});
+// Reset: current effect's own settings back to defaults, keep text / font / position
+$('reset').onclick = () => { buildParams($('effect').value); reload(); };
+
+/* ---------- team presets (stored on the server so everyone sees them) ---------- */
+let presets = [];
+function presetAutoName(){
+  const def = effects.find(e => e.id === $('effect').value); const eff = def ? def.name : 'Preset';
+  if (isGraphic()) return eff;
+  const words = $('text').value.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean).slice(0, 2).join(' ');
+  return words ? `${eff} · ${words}` : eff;
+}
+async function loadPresets(){ try { presets = await (await fetch('/api/presets')).json(); } catch { presets = []; } renderPresets(); }
+function renderPresets(){
+  const ul = $('presetList'); ul.innerHTML = '';
+  $('presetEmpty').hidden = presets.length > 0;
+  presets.forEach(p => {
+    const li = document.createElement('li');
+    const d = new Date(p.updated || p.created || Date.now()); const date = `${d.getMonth() + 1}/${d.getDate()}`;
+    li.innerHTML = `<span class="pn" title="${p.name}">${p.name}</span><span class="pd">${date}</span><button data-a="ren" title="Rename">✎</button><button data-a="del" title="Delete">×</button>`;
+    li.onclick = e => { if (e.target.closest('button')) return; applyConfig(p.config); if (!$('gallery').hidden) openEditor(); else reload(); };
+    li.querySelector('[data-a=ren]').onclick = async () => { const nn = prompt('New name', p.name); if (!nn || nn.trim() === p.name) return; await fetch('/api/presets/' + encodeURIComponent(p.name), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nn.trim() }) }); loadPresets(); };
+    li.querySelector('[data-a=del]').onclick = async () => { if (!confirm(`Delete preset "${p.name}"?`)) return; await fetch('/api/presets/' + encodeURIComponent(p.name), { method: 'DELETE' }); loadPresets(); };
+    ul.appendChild(li);
+  });
+}
+$('savePreset').onclick = async () => {
+  const name = prompt('Preset name', presetAutoName()); if (!name || !name.trim()) return;
+  const n = name.trim();
+  if (presets.some(p => p.name === n) && !confirm(`"${n}" already exists. Overwrite it?`)) return;
+  const r = await fetch('/api/presets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, config: readConfig(), overwrite: true }) });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); alert('Could not save: ' + (j.error || r.status)); return; }
+  await loadPresets();
+};
+loadPresets();
 function showExit(){ const on = $('exit').value === 'reverse'; $('holdBox').hidden = !on; $('exitSpeedBox').hidden = !on; }
 $('exit').addEventListener('change', showExit);
 
@@ -481,12 +594,25 @@ $('logoDrop').ondragover = e => { e.preventDefault(); $('logoDrop').classList.ad
 $('logoDrop').ondragleave = () => $('logoDrop').classList.remove('over');
 $('logoDrop').ondrop = e => { e.preventDefault(); $('logoDrop').classList.remove('over'); addLogoFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/'))); };
 $('params').addEventListener('input', () => reload());
+$('paramsAdv').addEventListener('input', () => reload());
 document.querySelectorAll('aside.left input, aside.left select, aside.left textarea').forEach(el => el.addEventListener('input', () => reload()));
+// remember which "More" sections the user keeps open
+document.querySelectorAll('details.more').forEach(d => {
+  try { if (localStorage.getItem('tm:more:' + d.id) === '1') d.open = true; } catch {}
+  d.addEventListener('toggle', () => { try { localStorage.setItem('tm:more:' + d.id, d.open ? '1' : '0'); } catch {} });
+});
 ['w','h','fps'].forEach(id => $(id).addEventListener('input', () => reload(false)));
 $('preset').onchange = e => { const v = e.target.value; $('customSize').hidden = v !== 'custom'; if (v !== 'custom') { const [w,h] = v.split('x'); $('w').value = w; $('h').value = h; } reload(false); };
-function setExportLabel(){ $('export').textContent = { prores4444: 'Export .mov', png: 'Export PNG sequence', mp4: 'Export .mp4' }[$('format').value]; }
+function setExportLabel(){ $('exportLabel').textContent = { prores4444: 'Export .mov', png: 'Export PNG', mp4: 'Export .mp4' }[$('format').value]; }
 $('format').onchange = () => { setExportLabel(); save(); };
-function showVals(){ document.querySelectorAll('.sv').forEach(b => { const el = $(b.dataset.for); if (!el) return; const st = +el.step || 1; const dec = st < 0.01 ? 3 : st < 0.1 ? 2 : st < 1 ? 1 : 0; b.textContent = (+el.value).toFixed(dec) + (b.dataset.unit || ''); }); }
+function showVals(){ document.querySelectorAll('.sv').forEach(b => { const el = $(b.dataset.for); if (!el) return; const st = +el.step || 1; const dec = st < 0.01 ? 3 : st < 0.1 ? 2 : st < 1 ? 1 : 0; b.textContent = (+el.value).toFixed(dec) + (b.dataset.unit || ''); if (b.dataset.for === 'maxWidth' && +el.value >= 100) b.textContent = 'off'; }); }
+// when auto-wrap added lines and leading is still the single-line default, the engine renders at 0.95: say so
+function showWrapHint(wrapped){
+  const b = document.querySelector('.sv[data-for=leading]'); if (!b) return;
+  const auto = wrapped && Math.abs(+$('leading').value - 0.62) < 1e-6;
+  b.textContent = auto ? '0.62 → 0.95 auto' : (+$('leading').value).toFixed(2);
+  b.title = auto ? 'Auto-wrap added lines, so line height is 0.95 for now. Move the slider to set your own.' : '';
+}
 document.querySelectorAll('.sv').forEach(b => { const el = $(b.dataset.for); if (el) el.addEventListener('input', showVals); });
 showVals();
 function setVpos(v, doReload = true){ $('vpos').value = v; document.querySelectorAll('#vposSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); updateMarginState(); if (doReload) reload(); }
